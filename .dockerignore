@@ -1,9 +1,10 @@
-# Exclude everything except medusa-backend
+# Exclude everything by default
 *
-!medusa-backend/
-!medusa-backend/**/*
 
-# But still exclude these inside medusa-backend
+# Only include medusa-backend
+!medusa-backend/
+
+# Exclude large/unnecessary files inside medusa-backend
 medusa-backend/node_modules/
 medusa-backend/.git/
 medusa-backend/integration-tests/
@@ -13,3 +14,4 @@ medusa-backend/.DS_Store
 medusa-backend/.env
 medusa-backend/.env.local
 medusa-backend/.env.*.local
+medusa-backend/static/
