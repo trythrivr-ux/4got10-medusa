@@ -5,6 +5,9 @@ if (process.env.NODE_ENV !== "production") {
   loadEnv(process.env.NODE_ENV || "development", process.cwd());
 }
 
+// Debug: Log if REDIS_URL is available
+console.log("REDIS_URL available:", !!process.env.REDIS_URL);
+
 module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,

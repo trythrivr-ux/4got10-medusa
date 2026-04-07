@@ -15,6 +15,11 @@ EOF
 # Run migrations from root
 yarn medusa db:migrate
 
+# Create publishable key if PUBLISHABLE_KEY is set
+if [ -n "$PUBLISHABLE_KEY" ]; then
+  echo "Publishable key provided: $PUBLISHABLE_KEY"
+fi
+
 # Start from .medusa/server directory (required by Medusa)
 cd .medusa/server
 exec npx medusa start
