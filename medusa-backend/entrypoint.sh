@@ -4,6 +4,7 @@ set -e
 # Create .env file from Railway environment variables
 cat > .env << EOF
 DATABASE_URL=$DATABASE_URL
+REDIS_URL=$REDIS_URL
 JWT_SECRET=$JWT_SECRET
 COOKIE_SECRET=$COOKIE_SECRET
 STORE_CORS=$STORE_CORS
