@@ -12,5 +12,5 @@ AUTH_CORS=$AUTH_CORS
 EOF
 
 # Run migrations and start
-medusa db:migrate
-exec medusa start
+yarn medusa db:migrate
+exec yarn start
