@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# Debug: Check if REDIS_URL is available
-echo "=== DEBUG: REDIS_URL is: $REDIS_URL ==="
-echo "=== DEBUG: DATABASE_URL is: ${DATABASE_URL:0:30}... ==="
+# Debug: Check if REDIS_URL is available (write to stderr for Railway logs)
+>&2 echo "=== DEBUG: REDIS_URL is: $REDIS_URL ==="
+>&2 echo "=== DEBUG: DATABASE_URL is: ${DATABASE_URL:0:30}... ==="
 
 # Create .env file from Railway environment variables
 cat > .env << EOF
@@ -17,16 +17,11 @@ AUTH_CORS=$AUTH_CORS
 EOF
 
 # Debug: Show .env file contents
-echo "=== DEBUG: .env file created ==="
-cat .env | head -5
+>&2 echo "=== DEBUG: .env file created ==="
+>&2 cat .env | head -5
 
 # Run migrations from root
 yarn medusa db:migrate
-
-# Create publishable key if PUBLISHABLE_KEY is set
-if [ -n "$PUBLISHABLE_KEY" ]; then
-  echo "Publishable key provided: $PUBLISHABLE_KEY"
-fi
 
 # Start from .medusa/server directory (required by Medusa)
 cd .medusa/server
