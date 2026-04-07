@@ -11,13 +11,9 @@ ADMIN_CORS=$ADMIN_CORS
 AUTH_CORS=$AUTH_CORS
 EOF
 
-# Debug: Find admin build
-echo "=== Checking .medusa structure ==="
-ls -laR .medusa/ 2>/dev/null | head -100
-echo "=== Searching for index.html ==="
-find .medusa -name "*.html" 2>/dev/null
-find . -name "index.html" -path "*/.medusa/*" 2>/dev/null
-
-# Run migrations and start
+# Run migrations from root
 yarn medusa db:migrate
+
+# Start from .medusa/server directory (required by Medusa)
+cd .medusa/server
 exec yarn start
