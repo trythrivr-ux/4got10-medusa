@@ -2,4 +2,4 @@
 builder = "railpack"
 
 [deploy]
-startCommand = "yarn start"
+startCommand = "medusa db:setup && medusa start"
