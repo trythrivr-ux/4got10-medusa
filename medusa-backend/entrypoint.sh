@@ -16,4 +16,4 @@ yarn medusa db:migrate
 
 # Start from .medusa/server directory (required by Medusa)
 cd .medusa/server
-exec yarn start
+exec npx medusa start
