@@ -1,5 +1,8 @@
 FROM node:20-bookworm
 
+# Cache bust
+ARG CACHE_BUST=1
+
 WORKDIR /app
 
 # Install dependencies
@@ -17,6 +20,9 @@ RUN ls -la .medusa/server/public/admin/ && cat .medusa/server/public/admin/index
 
 # Make entrypoint executable
 RUN chmod +x /app/entrypoint.sh
+
+# Debug: show entrypoint contents
+RUN echo "=== Entrypoint contents ===" && head -10 /app/entrypoint.sh
 
 # Expose port
 EXPOSE 9000
