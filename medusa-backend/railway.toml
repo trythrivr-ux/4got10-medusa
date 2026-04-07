@@ -1,5 +1,5 @@
 [build]
-builder = "railpack"
+builder = "dockerfile"
 
 [deploy]
 startCommand = "printenv | grep -E 'DATABASE_URL|REDIS_URL|JWT_SECRET|COOKIE_SECRET|STORE_CORS|ADMIN_CORS|AUTH_CORS' > .env && medusa db:migrate && medusa start"
