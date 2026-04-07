@@ -1,12 +1,12 @@
 # Exclude everything by default
 *
 
-# Only include medusa-backend
+# Re-include medusa-backend and all its contents
 !medusa-backend/
+!medusa-backend/**/*
 
-# Exclude large/unnecessary files inside medusa-backend
+# But exclude these inside medusa-backend
 medusa-backend/node_modules/
-medusa-backend/.git/
 medusa-backend/integration-tests/
 medusa-backend/.vscode/
 medusa-backend/*.log
@@ -14,4 +14,3 @@ medusa-backend/.DS_Store
 medusa-backend/.env
 medusa-backend/.env.local
 medusa-backend/.env.*.local
-medusa-backend/static/
