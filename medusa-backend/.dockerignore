@@ -9,4 +9,4 @@ integration-tests
 .vscode
 *.log
 .DS_Store
-!.medusa
+.medusa
