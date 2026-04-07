@@ -2,4 +2,8 @@
 builder = "railpack"
 
 [deploy]
-startCommand = "printenv | grep -E 'DATABASE_URL|REDIS_URL|JWT_SECRET|COOKIE_SECRET|STORE_CORS|ADMIN_CORS|AUTH_CORS' > .env && medusa build && medusa db:migrate && medusa start"
+startCommand = "printenv | grep -E 'DATABASE_URL|REDIS_URL|JWT_SECRET|COOKIE_SECRET|STORE_CORS|ADMIN_CORS|AUTH_CORS' > .env && medusa db:migrate && medusa start"
+healthcheckCommand = "curl -f http://localhost:9000/health || exit 1"
+healthcheckInterval = "30s"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
