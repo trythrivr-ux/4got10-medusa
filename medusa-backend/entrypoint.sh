@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Debug: Check if REDIS_URL is available
+echo "=== DEBUG: REDIS_URL is: $REDIS_URL ==="
+echo "=== DEBUG: DATABASE_URL is: ${DATABASE_URL:0:30}... ==="
+
 # Create .env file from Railway environment variables
 cat > .env << EOF
 DATABASE_URL=$DATABASE_URL
@@ -11,6 +15,10 @@ STORE_CORS=$STORE_CORS
 ADMIN_CORS=$ADMIN_CORS
 AUTH_CORS=$AUTH_CORS
 EOF
+
+# Debug: Show .env file contents
+echo "=== DEBUG: .env file created ==="
+cat .env | head -5
 
 # Run migrations from root
 yarn medusa db:migrate
