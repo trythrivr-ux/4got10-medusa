@@ -11,10 +11,12 @@ ADMIN_CORS=$ADMIN_CORS
 AUTH_CORS=$AUTH_CORS
 EOF
 
-# Debug: Check if .medusa folder exists
-echo "Checking .medusa folder..."
-ls -la .medusa/ 2>/dev/null || echo ".medusa folder not found"
-ls -la .medusa/server/ 2>/dev/null || echo ".medusa/server not found"
+# Debug: Find admin build
+echo "=== Checking .medusa structure ==="
+ls -laR .medusa/ 2>/dev/null | head -100
+echo "=== Searching for index.html ==="
+find .medusa -name "*.html" 2>/dev/null
+find . -name "index.html" -path "*/.medusa/*" 2>/dev/null
 
 # Run migrations and start
 yarn medusa db:migrate
