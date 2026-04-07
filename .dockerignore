@@ -1,0 +1,15 @@
+# Exclude everything except medusa-backend
+*
+!medusa-backend/
+!medusa-backend/**/*
+
+# But still exclude these inside medusa-backend
+medusa-backend/node_modules/
+medusa-backend/.git/
+medusa-backend/integration-tests/
+medusa-backend/.vscode/
+medusa-backend/*.log
+medusa-backend/.DS_Store
+medusa-backend/.env
+medusa-backend/.env.local
+medusa-backend/.env.*.local
