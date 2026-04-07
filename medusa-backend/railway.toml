@@ -2,7 +2,7 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "printenv | grep -E 'DATABASE_URL|REDIS_URL|JWT_SECRET|COOKIE_SECRET|STORE_CORS|ADMIN_CORS|AUTH_CORS' > .env && medusa db:migrate && medusa start"
+startCommand = "echo \"DATABASE_URL=$DATABASE_URL\" > .env && echo \"JWT_SECRET=$JWT_SECRET\" >> .env && echo \"COOKIE_SECRET=$COOKIE_SECRET\" >> .env && echo \"STORE_CORS=$STORE_CORS\" >> .env && echo \"ADMIN_CORS=$ADMIN_CORS\" >> .env && echo \"AUTH_CORS=$AUTH_CORS\" >> .env && medusa db:migrate && medusa start"
 healthcheckCommand = "curl -f http://localhost:9000/health || exit 1"
 healthcheckInterval = "30s"
 restartPolicyType = "on_failure"
