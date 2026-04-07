@@ -16,8 +16,8 @@ module.exports = defineConfig({
       cookieSecret: process.env.COOKIE_SECRET || "supersecret",
     },
     cookieOptions: {
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      secure: false, // Railway proxy handles HTTPS, Express sees HTTP
       httpOnly: true,
       maxAge: 10 * 60 * 60 * 1000, // 10 hours
     },
