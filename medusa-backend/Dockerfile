@@ -10,8 +10,11 @@ RUN corepack enable && corepack prepare yarn@1.22.22 --activate && yarn install 
 COPY . .
 RUN yarn build
 
+# Make entrypoint executable
+RUN chmod +x /app/entrypoint.sh
+
 # Expose port
 EXPOSE 9000
 
-# Start command
-CMD ["yarn", "start"]
+# Use entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"]
