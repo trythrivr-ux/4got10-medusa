@@ -10,14 +10,19 @@ WORKDIR /app
 COPY package.json yarn.lock ./
 RUN corepack enable && corepack prepare yarn@1.22.22 --activate && yarn install --frozen-lockfile
 
-# Copy all source files
-COPY . .
+# Copy source files individually to control what gets copied
+COPY medusa-config.ts ./
+COPY tsconfig.json ./
+COPY src ./src
+COPY entrypoint.sh ./
+COPY .build-cache ./
 
-# Remove any cached build and rebuild fresh
-RUN rm -rf .medusa && yarn build
+# Build the application (no .medusa folder exists at this point)
+RUN yarn build
 
 # Verify redisUrl and cookieOptions are in compiled config
 RUN echo "=== Checking compiled config ===" && \
+    cat .medusa/server/medusa-config.js | head -30 && \
     grep "redisUrl" .medusa/server/medusa-config.js && echo "SUCCESS: redisUrl found" && \
     grep "cookieOptions" .medusa/server/medusa-config.js && echo "SUCCESS: cookieOptions found"
 
