@@ -12,6 +12,7 @@ RUN corepack enable && corepack prepare yarn@1.22.22 --activate && yarn install 
 
 # Copy source files individually to control what gets copied
 COPY medusa-config.ts ./
+COPY medusa-config.runtime.js ./
 COPY tsconfig.json ./
 COPY src ./src
 COPY entrypoint.sh ./
@@ -19,12 +20,6 @@ COPY .build-cache ./
 
 # Build the application (no .medusa folder exists at this point)
 RUN yarn build
-
-# Verify redisUrl and cookieOptions are in compiled config
-RUN echo "=== Checking compiled config ===" && \
-    cat .medusa/server/medusa-config.js | head -30 && \
-    grep "redisUrl" .medusa/server/medusa-config.js && echo "SUCCESS: redisUrl found" && \
-    grep "cookieOptions" .medusa/server/medusa-config.js && echo "SUCCESS: cookieOptions found"
 
 # Make entrypoint executable
 RUN chmod +x /app/entrypoint.sh
