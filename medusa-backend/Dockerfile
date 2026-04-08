@@ -1,10 +1,8 @@
-# Force cache invalidation with build timestamp
-ARG BUILD_DATE=2026-04-08-v2
-FROM node:20.12-bookworm-slim
+# Force cache invalidation with alpine image
+FROM node:20-alpine
 
-# Re-declare ARG after FROM
-ARG BUILD_DATE
-RUN echo "Build date: $BUILD_DATE"
+# Install build dependencies for native modules
+RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
