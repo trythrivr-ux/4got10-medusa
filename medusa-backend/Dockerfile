@@ -1,8 +1,8 @@
 # Force cache invalidation with alpine image
 FROM node:20-alpine
 
-# Install build dependencies for native modules
-RUN apk add --no-cache python3 make g++
+# Install build dependencies and bash for entrypoint
+RUN apk add --no-cache python3 make g++ bash
 
 WORKDIR /app
 
