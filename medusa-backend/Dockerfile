@@ -1,4 +1,10 @@
-FROM node:20-bookworm-slim
+# Force cache invalidation with build timestamp
+ARG BUILD_DATE=2026-04-08-v2
+FROM node:20.12-bookworm-slim
+
+# Re-declare ARG after FROM
+ARG BUILD_DATE
+RUN echo "Build date: $BUILD_DATE"
 
 WORKDIR /app
 
