@@ -40,18 +40,34 @@ module.exports = defineConfig({
             options: {
               file_url:
                 process.env.S3_FILE_URL ||
-                ((process.env.S3_ENDPOINT || process.env.ENDPOINT) &&
-                  (process.env.S3_BUCKET || process.env.BUCKET))
-                  ? `${process.env.S3_ENDPOINT || process.env.ENDPOINT}/${process.env.S3_BUCKET || process.env.BUCKET}`
+                ((process.env.S3_ENDPOINT ||
+                  process.env.ENDPOINT ||
+                  process.env.RAILWAY_BUCKET_ENDPOINT) &&
+                  (process.env.S3_BUCKET ||
+                    process.env.BUCKET ||
+                    process.env.RAILWAY_BUCKET_NAME))
+                  ? `${process.env.S3_ENDPOINT || process.env.ENDPOINT || process.env.RAILWAY_BUCKET_ENDPOINT}/${process.env.S3_BUCKET || process.env.BUCKET || process.env.RAILWAY_BUCKET_NAME}`
                   : undefined,
               access_key_id:
-                process.env.S3_ACCESS_KEY_ID || process.env.ACCESS_KEY_ID,
+                process.env.S3_ACCESS_KEY_ID ||
+                process.env.ACCESS_KEY_ID ||
+                process.env.RAILWAY_BUCKET_ACCESS_KEY_ID,
               secret_access_key:
                 process.env.S3_SECRET_ACCESS_KEY ||
-                process.env.SECRET_ACCESS_KEY,
-              region: process.env.S3_REGION || process.env.REGION,
-              bucket: process.env.S3_BUCKET || process.env.BUCKET,
-              endpoint: process.env.S3_ENDPOINT || process.env.ENDPOINT,
+                process.env.SECRET_ACCESS_KEY ||
+                process.env.RAILWAY_BUCKET_SECRET_ACCESS_KEY,
+              region:
+                process.env.S3_REGION ||
+                process.env.REGION ||
+                process.env.RAILWAY_BUCKET_REGION,
+              bucket:
+                process.env.S3_BUCKET ||
+                process.env.BUCKET ||
+                process.env.RAILWAY_BUCKET_NAME,
+              endpoint:
+                process.env.S3_ENDPOINT ||
+                process.env.ENDPOINT ||
+                process.env.RAILWAY_BUCKET_ENDPOINT,
               additional_client_config: {
                 forcePathStyle: true,
               },
