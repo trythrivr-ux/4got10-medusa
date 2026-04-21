@@ -30,5 +30,35 @@ module.exports = defineConfig({
     {
       resolve: "./src/modules/product_meta",
     },
+    {
+      resolve: "@medusajs/medusa/file",
+      options: {
+        providers: [
+          {
+            resolve: "@medusajs/medusa/file-s3",
+            id: "s3",
+            options: {
+              file_url:
+                process.env.S3_FILE_URL ||
+                ((process.env.S3_ENDPOINT || process.env.ENDPOINT) &&
+                  (process.env.S3_BUCKET || process.env.BUCKET))
+                  ? `${process.env.S3_ENDPOINT || process.env.ENDPOINT}/${process.env.S3_BUCKET || process.env.BUCKET}`
+                  : undefined,
+              access_key_id:
+                process.env.S3_ACCESS_KEY_ID || process.env.ACCESS_KEY_ID,
+              secret_access_key:
+                process.env.S3_SECRET_ACCESS_KEY ||
+                process.env.SECRET_ACCESS_KEY,
+              region: process.env.S3_REGION || process.env.REGION,
+              bucket: process.env.S3_BUCKET || process.env.BUCKET,
+              endpoint: process.env.S3_ENDPOINT || process.env.ENDPOINT,
+              additional_client_config: {
+                forcePathStyle: true,
+              },
+            },
+          },
+        ],
+      },
+    },
   ],
 });
