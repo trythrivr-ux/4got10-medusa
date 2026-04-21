@@ -12,9 +12,7 @@ const s3Client = new S3Client({
 });
 
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
-  const keyParam = (req.params as any).key;
-
-  const key = Array.isArray(keyParam) ? keyParam.join("/") : keyParam;
+  const key = (req.params as any).key as string | undefined;
 
   if (!key) {
     return res.status(400).json({ error: "Missing key" });
