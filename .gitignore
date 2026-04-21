@@ -41,3 +41,6 @@ coverage/
 # Cache
 .cache/
 .temp/
+
+# Ignore Medusa static uploads
+medusa-backend/static/
