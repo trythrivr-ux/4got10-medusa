@@ -1,5 +1,8 @@
-import { defineMiddlewares } from "@medusajs/framework/http"
-import { z } from "@medusajs/framework/zod"
+import { defineMiddlewares } from "@medusajs/framework/http";
+import { z } from "@medusajs/framework/zod";
+
+// Import workflow hooks to register them
+import "../workflows/hooks";
 
 export default defineMiddlewares({
   routes: [
@@ -22,4 +25,4 @@ export default defineMiddlewares({
       },
     },
   ],
-})
+});

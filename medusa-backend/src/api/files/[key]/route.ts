@@ -35,7 +35,10 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 
     const buffer = Buffer.concat(chunks);
 
-    res.setHeader("Content-Type", response.ContentType || "application/octet-stream");
+    res.setHeader(
+      "Content-Type",
+      response.ContentType || "application/octet-stream",
+    );
     res.setHeader("Cache-Control", "public, max-age=31536000");
     res.send(buffer);
   } catch (error: any) {

@@ -31,6 +31,12 @@ module.exports = defineConfig({
       resolve: "./src/modules/product_meta",
     },
     {
+      resolve: "./src/modules/rollout",
+    },
+    {
+      resolve: "./src/modules/email",
+    },
+    {
       resolve: "@medusajs/medusa/file",
       options: {
         providers: [
@@ -47,6 +53,20 @@ module.exports = defineConfig({
               additional_client_config: {
                 forcePathStyle: true,
               },
+            },
+          },
+        ],
+      },
+    },
+    {
+      resolve: "@medusajs/medusa/payment",
+      options: {
+        providers: [
+          {
+            resolve: "@medusajs/payment-stripe",
+            id: "stripe",
+            options: {
+              apiKey: process.env.STRIPE_SECRET_KEY,
             },
           },
         ],
