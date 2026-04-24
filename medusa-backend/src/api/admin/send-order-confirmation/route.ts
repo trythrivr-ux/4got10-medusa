@@ -1,30 +1,27 @@
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 
-export async function POST(
-  req: MedusaRequest,
-  res: MedusaResponse
-) {
-  const { order_id } = req.body as { order_id: string }
+export async function POST(req: MedusaRequest, res: MedusaResponse) {
+  const { order_id } = req.body as { order_id: string };
 
   if (!order_id) {
-    return res.status(400).json({ error: "order_id is required" })
+    return res.status(400).json({ error: "order_id is required" });
   }
 
   try {
-    const emailModule = req.scope.resolve("email")
+    const emailModule = req.scope.resolve("email");
 
     // Fetch the full order details using the query service
-    const query = req.scope.resolve("query")
+    const query = req.scope.resolve("query");
     const { data: orders } = await query.graph({
       entity: "order",
       fields: ["*", "items.*", "customer.*"],
       filters: { id: order_id },
-    })
+    });
 
-    const order = Array.isArray(orders) ? orders[0] : orders
+    const order = Array.isArray(orders) ? orders[0] : orders;
 
     await emailModule.sendOrderConfirmation({
-      to: (order as any).email || "",
+      to: (order as any).customer?.email || (order as any).email || "",
       orderId: (order as any).id,
       customerName: (order as any).customer?.first_name
         ? `${(order as any).customer.first_name} ${(order as any).customer.last_name || ""}`
@@ -36,11 +33,11 @@ export async function POST(
       })),
       total: (order as any).total,
       currency: (order as any).currency_code || "USD",
-    })
+    });
 
-    res.json({ success: true })
+    res.json({ success: true });
   } catch (error) {
-    console.error("Failed to send order confirmation email:", error)
-    res.status(500).json({ error: "Failed to send email" })
+    console.error("Failed to send order confirmation email:", error);
+    res.status(500).json({ error: "Failed to send email" });
   }
 }

@@ -1,30 +1,35 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
-import RolloutModuleService from "../../../../modules/rollout/service";
 
 export async function GET(
   req: MedusaRequest & { params: { id: string } },
-  res: MedusaResponse
+  res: MedusaResponse,
 ) {
-  const rolloutService: RolloutModuleService = req.scope.resolve("rolloutService");
-  
-  const rollout = await rolloutService.retrieveRollout(req.params.id);
-  
+  const query = req.scope.resolve("query");
+
+  const { data: rollouts } = await query.graph({
+    entity: "rollout",
+    fields: ["*"],
+    filters: { id: req.params.id },
+  });
+
+  const rollout = Array.isArray(rollouts) ? rollouts[0] : rollouts;
+
   res.json({
     rollout,
   });
 }
 
 export async function POST(
-  req: MedusaRequest & { params: { id: string }, body: any },
-  res: MedusaResponse
+  req: MedusaRequest & { params: { id: string }; body: any },
+  res: MedusaResponse,
 ) {
-  const rolloutService: RolloutModuleService = req.scope.resolve("rolloutService");
-  
+  const rolloutService = req.scope.resolve("rollout") as any;
+
   const rollout = await rolloutService.updateRollouts({
     id: req.params.id,
     ...req.body,
   });
-  
+
   res.json({
     rollout,
   });
@@ -32,11 +37,11 @@ export async function POST(
 
 export async function DELETE(
   req: MedusaRequest & { params: { id: string } },
-  res: MedusaResponse
+  res: MedusaResponse,
 ) {
-  const rolloutService: RolloutModuleService = req.scope.resolve("rolloutService");
-  
-  await rolloutService.deleteRollouts(req.params.id);
-  
+  const rolloutService = req.scope.resolve("rollout") as any;
+
+  await rolloutService.deleteRollouts([req.params.id]);
+
   res.status(204).send();
 }

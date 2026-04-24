@@ -26,9 +26,19 @@ export default async function orderCreatedHandler({ container }: any) {
     }
 
     console.log("Fetched order:", order.id, "currency:", order.currency_code);
+    console.log("Order email:", (order as any).email);
+    console.log("Order customer email:", (order as any).customer?.email);
+    console.log(
+      "Order customer object:",
+      JSON.stringify((order as any).customer, null, 2),
+    );
+
+    const recipientEmail =
+      (order as any).customer?.email || (order as any).email || "";
+    console.log("Using recipient email:", recipientEmail);
 
     await emailModule.sendOrderConfirmation({
-      to: (order as any).email || "",
+      to: recipientEmail,
       orderId: (order as any).id,
       customerName: (order as any).customer?.first_name
         ? `${(order as any).customer.first_name} ${(order as any).customer.last_name || ""}`

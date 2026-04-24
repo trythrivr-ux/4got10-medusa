@@ -21,7 +21,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const order = Array.isArray(orders) ? orders[0] : orders;
 
     await emailModule.sendOrderConfirmation({
-      to: (order as any).email || "",
+      to: (order as any).customer?.email || (order as any).email || "",
       orderId: (order as any).id,
       customerName: (order as any).customer?.first_name
         ? `${(order as any).customer.first_name} ${(order as any).customer.last_name || ""}`

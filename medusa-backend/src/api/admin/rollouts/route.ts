@@ -1,11 +1,12 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
-import RolloutModuleService from "../../../modules/rollout/service";
 
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
-  const rolloutService: RolloutModuleService =
-    req.scope.resolve("rolloutService");
+  const query = req.scope.resolve("query");
 
-  const rollouts = await rolloutService.listRollouts();
+  const { data: rollouts } = await query.graph({
+    entity: "rollout",
+    fields: ["*"],
+  });
 
   res.json({
     rollouts,
@@ -16,8 +17,7 @@ export async function POST(
   req: MedusaRequest & { body: any },
   res: MedusaResponse,
 ) {
-  const rolloutService: RolloutModuleService =
-    req.scope.resolve("rolloutService");
+  const rolloutService = req.scope.resolve("rollout") as any;
 
   const rollout = await rolloutService.createRollouts(req.body);
 

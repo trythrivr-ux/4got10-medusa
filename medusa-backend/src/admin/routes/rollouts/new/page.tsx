@@ -25,10 +25,15 @@ const CreateRolloutPage = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [media, setMedia] = useState<string[]>([]);
   const [headlinerMedia, setHeadlinerMedia] = useState<string[]>([]);
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
+  const [headlinerMediaUrls, setHeadlinerMediaUrls] = useState<
+    Record<string, string>
+  >({});
   const [features, setFeatures] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -61,30 +66,65 @@ const CreateRolloutPage = () => {
     setSelectedProducts(newSelected);
   };
 
-  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
+  // Use Medusa's built-in upload endpoint
+  const handleFileUpload = async (file: File, type: "media" | "headliner") => {
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append("file", files[0]);
+      formData.append("files", file);
 
-      const response = await fetch("/admin/upload", {
+      const response = await fetch("/admin/uploads", {
         method: "POST",
         credentials: "include",
         body: formData,
       });
 
+      console.log("Upload response status:", response.status);
+
       if (response.ok) {
         const json = await response.json();
-        setMedia([...media, json.file.id]);
+        console.log("Upload response json:", json);
+
+        // Response structure is { files: [{ id, url, ... }] }
+        const upload = json.files?.[0];
+        const fileId = upload?.id || upload?.file_id;
+        const fileUrl = upload?.url || upload?.file_url || upload?.host;
+
+        console.log("Extracted - fileId:", fileId, "fileUrl:", fileUrl);
+
+        if (fileId) {
+          if (type === "media") {
+            setMedia([...media, fileId]);
+            if (fileUrl) {
+              setMediaUrls({ ...mediaUrls, [fileId]: fileUrl });
+            }
+          } else {
+            setHeadlinerMedia([...headlinerMedia, fileId]);
+            if (fileUrl) {
+              setHeadlinerMediaUrls({
+                ...headlinerMediaUrls,
+                [fileId]: fileUrl,
+              });
+            }
+          }
+        } else {
+          console.error("No file ID found in response");
+        }
+      } else {
+        const errorText = await response.text();
+        console.error("Upload failed:", response.status, errorText);
       }
     } catch (error) {
-      console.error("Failed to upload media:", error);
+      console.error("Failed to upload file:", error);
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await handleFileUpload(files[0], "media");
   };
 
   const handleHeadlinerMediaUpload = async (
@@ -92,27 +132,29 @@ const CreateRolloutPage = () => {
   ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    await handleFileUpload(files[0], "headliner");
+  };
 
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", files[0]);
-
-      const response = await fetch("/admin/upload", {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-
-      if (response.ok) {
-        const json = await response.json();
-        setHeadlinerMedia([...headlinerMedia, json.file.id]);
-      }
-    } catch (error) {
-      console.error("Failed to upload headliner media:", error);
-    } finally {
-      setUploading(false);
+  const handleDrop = async (
+    e: React.DragEvent,
+    type: "media" | "headliner",
+  ) => {
+    e.preventDefault();
+    setDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      await handleFileUpload(files[0], type);
     }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
   };
 
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,8 +169,6 @@ const CreateRolloutPage = () => {
       reader.onload = async (event) => {
         const data = event.target?.result;
         if (data) {
-          // Parse Excel file - for now, we'll store it as base64
-          // In production, you'd use a library like xlsx to parse the Excel
           const base64 = btoa(
             String.fromCharCode(...new Uint8Array(data as ArrayBuffer)),
           );
@@ -144,6 +184,48 @@ const CreateRolloutPage = () => {
     } catch (error) {
       console.error("Failed to upload Excel:", error);
       setUploading(false);
+    }
+  };
+
+  // Remove media from the list
+  const removeMedia = (index: number, type: "media" | "headliner") => {
+    if (type === "media") {
+      const removedId = media[index];
+      setMedia(media.filter((_, i) => i !== index));
+      setMediaUrls((prev) => {
+        const newUrls = { ...prev };
+        delete newUrls[removedId];
+        return newUrls;
+      });
+    } else {
+      const removedId = headlinerMedia[index];
+      setHeadlinerMedia(headlinerMedia.filter((_, i) => i !== index));
+      setHeadlinerMediaUrls((prev) => {
+        const newUrls = { ...prev };
+        delete newUrls[removedId];
+        return newUrls;
+      });
+    }
+  };
+
+  // Reorder media using drag and drop
+  const moveMedia = (
+    fromIndex: number,
+    toIndex: number,
+    type: "media" | "headliner",
+  ) => {
+    const list = type === "media" ? [...media] : [...headlinerMedia];
+    const urlList =
+      type === "media" ? { ...mediaUrls } : { ...headlinerMediaUrls };
+    const [movedItem] = list.splice(fromIndex, 1);
+    list.splice(toIndex, 0, movedItem);
+
+    if (type === "media") {
+      setMedia(list);
+      setMediaUrls(urlList);
+    } else {
+      setHeadlinerMedia(list);
+      setHeadlinerMediaUrls(urlList);
     }
   };
 
@@ -177,7 +259,7 @@ const CreateRolloutPage = () => {
       });
 
       if (response.ok) {
-        navigate("/admin/rollouts");
+        navigate("/app/rollouts");
       }
     } catch (error) {
       console.error("Failed to create rollout:", error);
@@ -272,35 +354,127 @@ const CreateRolloutPage = () => {
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="headliner-media" size="small">
-            Headliner Media
-          </Label>
-          <Input
-            id="headliner-media"
-            type="file"
-            onChange={handleHeadlinerMediaUpload}
-            disabled={uploading}
-          />
+          <Label size="small">Headliner Media</Label>
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+              dragOver ? "border-blue-500 bg-blue-50" : "border-gray-300"
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, "headliner")}
+          >
+            <Input
+              id="headliner-media"
+              type="file"
+              onChange={handleHeadlinerMediaUpload}
+              disabled={uploading}
+              className="hidden"
+            />
+            <label
+              htmlFor="headliner-media"
+              className="cursor-pointer text-sm text-ui-fg-subtle hover:text-ui-fg-base"
+            >
+              {uploading ? "Uploading..." : "Click to upload or drag and drop"}
+            </label>
+          </div>
           {headlinerMedia.length > 0 && (
-            <div className="text-sm text-ui-fg-subtle">
-              {headlinerMedia.length} file(s) uploaded
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {headlinerMedia.map((id, index) => (
+                <div
+                  key={id}
+                  className="relative group"
+                  draggable
+                  onDragStart={(e) =>
+                    e.dataTransfer.setData("text/plain", index.toString())
+                  }
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const fromIndex = parseInt(
+                      e.dataTransfer.getData("text/plain"),
+                    );
+                    moveMedia(fromIndex, index, "headliner");
+                  }}
+                >
+                  {headlinerMediaUrls[id] && (
+                    <img
+                      src={headlinerMediaUrls[id]}
+                      alt={`Headliner ${index + 1}`}
+                      className="w-full h-24 object-cover rounded border"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeMedia(index, "headliner")}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="media" size="small">
-            Media
-          </Label>
-          <Input
-            id="media"
-            type="file"
-            onChange={handleMediaUpload}
-            disabled={uploading}
-          />
+          <Label size="small">Media</Label>
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+              dragOver ? "border-blue-500 bg-blue-50" : "border-gray-300"
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, "media")}
+          >
+            <Input
+              id="media"
+              type="file"
+              onChange={handleMediaUpload}
+              disabled={uploading}
+              className="hidden"
+            />
+            <label
+              htmlFor="media"
+              className="cursor-pointer text-sm text-ui-fg-subtle hover:text-ui-fg-base"
+            >
+              {uploading ? "Uploading..." : "Click to upload or drag and drop"}
+            </label>
+          </div>
           {media.length > 0 && (
-            <div className="text-sm text-ui-fg-subtle">
-              {media.length} file(s) uploaded
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {media.map((id, index) => (
+                <div
+                  key={id}
+                  className="relative group"
+                  draggable
+                  onDragStart={(e) =>
+                    e.dataTransfer.setData("text/plain", index.toString())
+                  }
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const fromIndex = parseInt(
+                      e.dataTransfer.getData("text/plain"),
+                    );
+                    moveMedia(fromIndex, index, "media");
+                  }}
+                >
+                  {mediaUrls[id] && (
+                    <img
+                      src={mediaUrls[id]}
+                      alt={`Media ${index + 1}`}
+                      className="w-full h-24 object-cover rounded border"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeMedia(index, "media")}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -322,7 +496,6 @@ const CreateRolloutPage = () => {
               variant="secondary"
               size="small"
               onClick={() => {
-                // Download template - create a simple CSV template
                 const template =
                   "Feature Name,Description,Value\nFeature 1,Description 1,Value 1\nFeature 2,Description 2,Value 2";
                 const blob = new Blob([template], { type: "text/csv" });
@@ -360,7 +533,7 @@ const CreateRolloutPage = () => {
           <Button
             type="button"
             variant="secondary"
-            onClick={() => navigate("/admin/rollouts")}
+            onClick={() => navigate("/app/rollouts")}
           >
             Cancel
           </Button>

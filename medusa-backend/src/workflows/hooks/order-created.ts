@@ -4,13 +4,22 @@ console.log("ORDER HOOK FILE LOADED");
 
 createOrderWorkflow.hooks.orderCreated(async ({ order }, { container }) => {
   console.log("ORDER CREATED HOOK TRIGGERED - Order ID:", order.id);
+  console.log("Order email:", order.email);
+  console.log("Order customer email:", order.customer?.email);
+  console.log(
+    "Order customer object:",
+    JSON.stringify(order.customer, null, 2),
+  );
 
   try {
     const emailModule = container.resolve("email");
     console.log("Email module resolved successfully");
 
+    const recipientEmail = order.customer?.email || order.email;
+    console.log("Using recipient email:", recipientEmail);
+
     await emailModule.sendOrderConfirmation({
-      to: order.email,
+      to: recipientEmail,
       orderId: order.id,
       customerName: order.customer?.first_name
         ? `${order.customer.first_name} ${order.customer.last_name || ""}`

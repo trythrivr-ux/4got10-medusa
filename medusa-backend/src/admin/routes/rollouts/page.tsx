@@ -39,7 +39,7 @@ const RolloutsPage = () => {
     <Container className="p-4">
       <div className="flex justify-between items-center mb-4">
         <Heading level="h2">Rollouts</Heading>
-        <Button onClick={() => (window.location.href = "/admin/rollouts/new")}>
+        <Button onClick={() => (window.location.href = "/app/rollouts/new")}>
           Create Rollout
         </Button>
       </div>
@@ -72,7 +72,7 @@ const RolloutsPage = () => {
                   size="small"
                   variant="secondary"
                   onClick={() =>
-                    (window.location.href = `/admin/rollouts/${rollout.id}`)
+                    (window.location.href = `/app/rollouts/${rollout.id}`)
                   }
                 >
                   Edit
