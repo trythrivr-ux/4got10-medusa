@@ -31,6 +31,7 @@ const CreateRolloutPage = () => {
   >({});
   const [features, setFeatures] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [productsLoading, setProductsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -232,6 +233,7 @@ const CreateRolloutPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
       const payload = {
@@ -241,12 +243,15 @@ const CreateRolloutPage = () => {
           : null,
         drop_date: dropDate ? new Date(dropDate).toISOString() : null,
         sold_out_date: soldOutDate ? new Date(soldOutDate).toISOString() : null,
-        headliner,
-        description,
-        media: media,
-        features: features,
-        headliner_media: headlinerMedia,
-        product_ids: Array.from(selectedProducts),
+        headliner: headliner || null,
+        description: description || null,
+        media: media.length > 0 ? media : null,
+        features: features || null,
+        headliner_media: headlinerMedia.length > 0 ? headlinerMedia : null,
+        product_ids:
+          Array.from(selectedProducts).length > 0
+            ? Array.from(selectedProducts)
+            : null,
       };
 
       const response = await fetch("/admin/rollouts", {
@@ -260,9 +265,15 @@ const CreateRolloutPage = () => {
 
       if (response.ok) {
         navigate("/app/rollouts");
+      } else {
+        const json = await response.json().catch(() => ({}));
+        setError(
+          json?.message || json?.error || `Server error: ${response.status}`,
+        );
       }
-    } catch (error) {
-      console.error("Failed to create rollout:", error);
+    } catch (err: any) {
+      console.error("Failed to create rollout:", err);
+      setError(err?.message || "Failed to create rollout. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -537,6 +548,11 @@ const CreateRolloutPage = () => {
           >
             Cancel
           </Button>
+          {error && (
+            <div className="text-red-500 text-sm p-3 bg-red-50 rounded-md border border-red-200">
+              {error}
+            </div>
+          )}
           <Button type="submit" isLoading={loading}>
             Create Rollout
           </Button>

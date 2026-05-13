@@ -69,6 +69,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/rollout",
     },
     {
+      resolve: "./src/modules/site-settings",
+    },
+    {
       resolve: "./src/modules/email",
     },
     {

@@ -1,26 +1,13 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
-import fs from "fs";
-import path from "path";
-import os from "os";
-
-// Store lock file in temp directory to avoid file watcher triggering restarts
-const LOCK_FILE = path.join(os.tmpdir(), "4got10-website-lock.json");
-
-// Ensure lock file exists
-if (!fs.existsSync(LOCK_FILE)) {
-  fs.writeFileSync(LOCK_FILE, JSON.stringify({ locked: false }));
-}
+import { getSettings } from "../../../lib/site-settings";
 
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
-    const data = fs.readFileSync(LOCK_FILE, "utf-8");
-    const lockState = JSON.parse(data);
-    
+    const settings = await getSettings(req.scope);
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
-    
-    res.json({ locked: lockState.locked || false });
+    res.json({ locked: settings.locked ?? false });
   } catch (error) {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     res.json({ locked: false });
