@@ -68,6 +68,12 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       "http://localhost:8000";
 
     const currency = cart.region?.currency_code || "usd";
+    // Try to infer a locale/country prefix for storefront routes
+    const countryCode =
+      cart?.shipping_address?.country_code ||
+      cart?.region?.countries?.[0]?.iso_2 ||
+      cart?.region?.country_code ||
+      "us";
     const backendBase =
       process.env.BACKEND_PUBLIC_URL ||
       process.env.BACKEND_URL ||
@@ -128,7 +134,8 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       payment_method_types: ["card"],
       line_items,
       success_url: `${successBase}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${successBase}/checkout/cancel`,
+      // Redirect back to the localized cart page when customer cancels from Stripe
+      cancel_url: `${successBase}/${countryCode}/cart`,
       customer_email: cart.email || undefined,
       metadata: {
         cart_id,
