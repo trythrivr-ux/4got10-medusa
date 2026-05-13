@@ -1,8 +1,6 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import Stripe from "stripe";
-import { promises as fs } from "fs";
-import os from "os";
-import path from "path";
+import { getSettings } from "../../../../lib/site-settings";
 
 // POST /custom/stripe/checkout
 // Body: { cart_id: string }
@@ -106,14 +104,14 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       }
     } catch {}
 
-    // Determine Stripe mode (test/live) from a shared tmp file written by admin route
-    const tmpPath = path.join(os.tmpdir(), "4got10-stripe-mode.json");
+    // Determine Stripe mode from DB settings, fall back to STRIPE_MODE env var
     let stripeMode: "test" | "live" = "test";
     try {
-      const raw = await fs.readFile(tmpPath, "utf8");
-      const parsed = JSON.parse(raw);
-      if (parsed?.mode === "live") stripeMode = "live";
-    } catch {}
+      const settings = await getSettings(req.scope);
+      if (settings.stripe_mode === "live") stripeMode = "live";
+    } catch {
+      if (process.env.STRIPE_MODE === "live") stripeMode = "live";
+    }
 
     const secretFromEnv =
       stripeMode === "test"

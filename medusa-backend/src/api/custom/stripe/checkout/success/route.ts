@@ -1,8 +1,6 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import Stripe from "stripe";
-import { promises as fs } from "fs";
-import os from "os";
-import path from "path";
+import { getSettings } from "../../../../../lib/site-settings";
 import {
   completeCartWorkflow,
   capturePaymentWorkflow,
@@ -19,14 +17,14 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       return res.status(400).json({ error: "session_id is required" });
     }
 
-    // Determine Stripe mode from admin toggle tmp file
-    const tmpPath = path.join(os.tmpdir(), "4got10-stripe-mode.json");
+    // Determine Stripe mode from DB settings, fall back to STRIPE_MODE env var
     let stripeMode: "test" | "live" = "test";
     try {
-      const raw = await fs.readFile(tmpPath, "utf8");
-      const parsed = JSON.parse(raw);
-      if (parsed?.mode === "live") stripeMode = "live";
-    } catch {}
+      const settings = await getSettings(req.scope);
+      if (settings.stripe_mode === "live") stripeMode = "live";
+    } catch {
+      if (process.env.STRIPE_MODE === "live") stripeMode = "live";
+    }
 
     const STRIPE_SECRET_KEY =
       stripeMode === "test"
