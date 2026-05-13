@@ -69,8 +69,10 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
         "";
 
-      const details: any = session.customer_details || {};
-      const shipping: any = session.shipping || {};
+      const sessionData = session as any;
+      const details: any = sessionData.customer_details || {};
+      const shipping: any =
+        sessionData.shipping_details || sessionData.shipping || {};
       const shipAddr: any = shipping.address || {};
       const billAddr: any = details.address || {};
 
