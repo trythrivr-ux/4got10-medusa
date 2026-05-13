@@ -11,12 +11,12 @@ COPY package.json yarn.lock ./
 RUN corepack enable && corepack prepare yarn@1.22.22 --activate && yarn install --frozen-lockfile
 
 # Copy source files individually to control what gets copied
+COPY .build-cache ./
 COPY medusa-config.ts ./
 COPY medusa-config.runtime.js ./
 COPY tsconfig.json ./
 COPY src ./src
 COPY entrypoint.sh ./
-COPY .build-cache ./
 
 # Build the application (no .medusa folder exists at this point)
 RUN yarn build
