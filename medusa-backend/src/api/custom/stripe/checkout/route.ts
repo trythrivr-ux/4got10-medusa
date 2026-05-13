@@ -1,5 +1,8 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import Stripe from "stripe";
+import { promises as fs } from "fs";
+import os from "os";
+import path from "path";
 
 // POST /custom/stripe/checkout
 // Body: { cart_id: string }
@@ -13,7 +16,21 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       return res.status(400).json({ error: "cart_id is required" });
     }
 
-    const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+    // Determine Stripe mode (test/live) from a shared tmp file written by admin route
+    const tmpPath = path.join(os.tmpdir(), "4got10-stripe-mode.json");
+    let stripeMode: "test" | "live" = "test";
+    try {
+      const raw = await fs.readFile(tmpPath, "utf8");
+      const parsed = JSON.parse(raw);
+      if (parsed?.mode === "live") stripeMode = "live";
+    } catch {}
+
+    const secretFromEnv =
+      stripeMode === "test"
+        ? process.env.STRIPE_SECRET_KEY_TEST || process.env.STRIPE_SECRET_KEY
+        : process.env.STRIPE_SECRET_KEY;
+
+    const STRIPE_SECRET_KEY = secretFromEnv;
     if (!STRIPE_SECRET_KEY) {
       return res
         .status(500)
