@@ -18,7 +18,13 @@ class EmailModuleService {
     to: string;
     orderId: string;
     customerName: string;
-    items: Array<{ title: string; quantity: number; unit_price: number }>;
+    items: Array<{
+      title: string;
+      quantity: number;
+      unit_price: number;
+      thumbnail?: string | null;
+      variant_title?: string | null;
+    }>;
     total: number;
     currency: string;
   }) {
@@ -38,23 +44,78 @@ class EmailModuleService {
 
     const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@4got10.com";
 
-    const itemsHtml = data.items
-      .map(
-        (item) => `
-        <tr>
-          <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
-            <div style="font-weight: 500; color: #111827;">${item.title}</div>
-            <div style="font-size: 14px; color: #6b7280; margin-top: 4px;">
-              Qty: ${item.quantity} × ${new Intl.NumberFormat(data.currency, {
-                style: "currency",
-                currency: data.currency,
-              }).format(item.unit_price / 100)}
-            </div>
-          </td>
-        </tr>
-      `,
-      )
+    const backendBase =
+      process.env.BACKEND_PUBLIC_URL ||
+      process.env.BACKEND_URL ||
+      process.env.MEDUSA_BACKEND_URL ||
+      "http://localhost:9000";
+    const storefrontBase =
+      process.env.STOREFRONT_URL || process.env.NEXT_PUBLIC_BASE_URL || "";
+    const assetBase =
+      process.env.EMAIL_ASSET_BASE_URL || storefrontBase || backendBase;
+
+    const toAbsolute = (url?: string | null) => {
+      const u = (url || "").toString();
+      if (!u) return "";
+      if (/^https?:\/\//i.test(u)) return u;
+      if (u.startsWith("/")) {
+        return `${assetBase}${u}`;
+      }
+      return u;
+    };
+
+    const itemsHtml = (data.items || [])
+      .map((item) => {
+        const img = toAbsolute(item.thumbnail || "");
+        const variant = item.variant_title || "";
+        const unit = Number(item.unit_price) || 0;
+        const qty = Number(item.quantity) || 0;
+        const lineTotal = unit * qty;
+        const priceStr = new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: data.currency.toUpperCase(),
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(lineTotal);
+        return `
+          <tr>
+            <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
+              <table role="presentation" cellspacing="0" cellpadding="0" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="width: 90px; vertical-align: middle;">
+                    ${
+                      img
+                        ? `<div style=\"width:85px;height:85px;border:1.5px solid #efefef;border-radius:9px;overflow:hidden;background:#efefef\">
+                            <img src=\"${img}\" alt=\"${item.title}\" style=\"width:100%;height:100%;object-fit:cover;display:block\" />
+                         </div>`
+                        : ""
+                    }
+                  </td>
+                  <td style="vertical-align: middle; padding-left: 10px;">
+                    <div style="font-weight:600;color:#111827;font-size:13px;line-height:18px;">${item.title}</div>
+                    <div style="color:#6b7280;font-size:12px;line-height:16px;margin-top:2px;">
+                      ${variant ? `${variant} <span style=\"opacity:.6\">•</span> ` : ""}${priceStr} <span style=\"opacity:.6\">•</span> x ${item.quantity}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        `;
+      })
       .join("");
+
+    // Compute robust total in case data.total is missing
+    const providedTotal = Number(data.total);
+    const fallbackTotal = (data.items || []).reduce((acc, it) => {
+      const unit = Number(it.unit_price) || 0;
+      const qty = Number(it.quantity) || 0;
+      return acc + unit * qty;
+    }, 0);
+    const safeTotal =
+      Number.isFinite(providedTotal) && providedTotal > 0
+        ? providedTotal
+        : fallbackTotal;
 
     const html = `
       <!DOCTYPE html>
@@ -82,10 +143,12 @@ class EmailModuleService {
               <div style="border-top: 2px solid #111827; padding-top: 20px; display: flex; justify-content: space-between; align-items: center;">
                 <div style="font-size: 18px; font-weight: 600; color: #111827;">Total</div>
                 <div style="font-size: 24px; font-weight: 700; color: #111827;">
-                  ${new Intl.NumberFormat(data.currency, {
+                  ${new Intl.NumberFormat("en-US", {
                     style: "currency",
-                    currency: data.currency,
-                  }).format(data.total / 100)}
+                    currency: data.currency.toUpperCase(),
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }).format(safeTotal)}
                 </div>
               </div>
               

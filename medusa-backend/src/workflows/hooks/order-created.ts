@@ -28,6 +28,13 @@ createOrderWorkflow.hooks.orderCreated(async ({ order }, { container }) => {
         title: item.title,
         quantity: item.quantity,
         unit_price: item.unit_price,
+        thumbnail:
+          item.thumbnail ||
+          item.product?.thumbnail ||
+          item.product?.images?.[0]?.url ||
+          null,
+        variant_title:
+          item.variant?.title || (item as any)?.variant_title || null,
       })),
       total: order.total,
       currency: order.currency_code,

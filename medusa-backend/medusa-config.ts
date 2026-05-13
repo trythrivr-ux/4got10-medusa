@@ -1,4 +1,7 @@
 import { loadEnv, defineConfig } from "@medusajs/framework/utils";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
 // Only load .env file in development, not in production (Railway provides env vars)
 if (process.env.NODE_ENV !== "production") {
@@ -7,6 +10,38 @@ if (process.env.NODE_ENV !== "production") {
 
 // Debug: Log if REDIS_URL is available
 console.log("REDIS_URL available:", !!process.env.REDIS_URL);
+
+// Ensure MEDUSA_PUBLISHABLE_KEY is available server-side (fallback to NEXT_PUBLIC_*)
+if (
+  !process.env.MEDUSA_PUBLISHABLE_KEY &&
+  process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+) {
+  process.env.MEDUSA_PUBLISHABLE_KEY =
+    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY;
+}
+
+// Pick Stripe mode from admin switch tmp file (set via Admin UI toggle),
+// falling back to STRIPE_MODE env var (useful for Railway production), then "test".
+let stripeMode: "test" | "live" = "test";
+try {
+  const tmpFile = path.join(os.tmpdir(), "4got10-stripe-mode.json");
+  const raw = fs.readFileSync(tmpFile, "utf8");
+  const parsed = JSON.parse(raw);
+  if (parsed?.mode === "live") stripeMode = "live";
+} catch {
+  // Tmp file not found (e.g. first boot on Railway) — fall back to env var
+  if (process.env.STRIPE_MODE === "live") stripeMode = "live";
+}
+
+const stripeApiKey =
+  stripeMode === "live"
+    ? process.env.STRIPE_SECRET_KEY
+    : process.env.STRIPE_SECRET_KEY_TEST || process.env.STRIPE_SECRET_KEY;
+const stripeWebhookSecret =
+  stripeMode === "live"
+    ? process.env.STRIPE_WEBHOOK_SECRET_LIVE ||
+      process.env.STRIPE_WEBHOOK_SECRET
+    : process.env.STRIPE_WEBHOOK_SECRET;
 
 module.exports = defineConfig({
   projectConfig: {
@@ -66,7 +101,8 @@ module.exports = defineConfig({
             resolve: "@medusajs/payment-stripe",
             id: "stripe",
             options: {
-              apiKey: process.env.STRIPE_SECRET_KEY,
+              apiKey: stripeApiKey,
+              webhookSecret: stripeWebhookSecret,
             },
           },
         ],

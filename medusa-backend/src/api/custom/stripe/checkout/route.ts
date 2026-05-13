@@ -16,6 +16,96 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       return res.status(400).json({ error: "cart_id is required" });
     }
 
+    // Ensure the cart has an initialized payment collection with a Stripe payment session
+    // This is required so completeCartWorkflow can succeed after Stripe returns
+    const BACKEND_URL =
+      process.env.BACKEND_URL ||
+      process.env.MEDUSA_BACKEND_URL ||
+      "http://localhost:9000";
+    const publishableKey = process.env.MEDUSA_PUBLISHABLE_KEY || "";
+
+    // Try to read current payment collection from provided cart or fetch minimal cart info
+    let paymentCollectionId: string | null =
+      providedCart?.payment_collection?.id || null;
+    let hasStripeSession = false;
+    try {
+      if (!paymentCollectionId) {
+        const cartResp = await fetch(
+          `${BACKEND_URL}/store/carts/${encodeURIComponent(
+            cart_id,
+          )}?fields=payment_collection.id%2Cpayment_collection.payment_sessions.id%2Cpayment_collection.payment_sessions.provider_id`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              ...(publishableKey
+                ? { "x-publishable-api-key": publishableKey }
+                : {}),
+            },
+            cache: "no-store",
+          },
+        );
+        if (cartResp.ok) {
+          const cartJson = await cartResp.json();
+          const pc = cartJson?.cart?.payment_collection;
+          if (pc?.id) {
+            paymentCollectionId = pc.id;
+            hasStripeSession = Array.isArray(pc.payment_sessions)
+              ? pc.payment_sessions.some(
+                  (s: any) => s?.provider_id === "pp_stripe_stripe",
+                )
+              : false;
+          }
+        }
+      } else {
+        hasStripeSession = Array.isArray(
+          providedCart?.payment_collection?.payment_sessions,
+        )
+          ? providedCart.payment_collection.payment_sessions.some(
+              (s: any) => s?.provider_id === "pp_stripe_stripe",
+            )
+          : false;
+      }
+    } catch {}
+
+    // Create payment collection if missing
+    try {
+      if (!paymentCollectionId) {
+        const pcResp = await fetch(`${BACKEND_URL}/store/payment-collections`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(publishableKey
+              ? { "x-publishable-api-key": publishableKey }
+              : {}),
+          },
+          body: JSON.stringify({ cart_id }),
+        });
+        if (pcResp.ok) {
+          const pcJson = await pcResp.json();
+          paymentCollectionId = pcJson?.payment_collection?.id || null;
+        }
+      }
+    } catch {}
+
+    // Create Stripe payment session for collection if missing
+    try {
+      if (paymentCollectionId && !hasStripeSession) {
+        await fetch(
+          `${BACKEND_URL}/store/payment-collections/${paymentCollectionId}/payment-sessions`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(publishableKey
+                ? { "x-publishable-api-key": publishableKey }
+                : {}),
+            },
+            body: JSON.stringify({ provider_id: "pp_stripe_stripe" }),
+          },
+        );
+      }
+    } catch {}
+
     // Determine Stripe mode (test/live) from a shared tmp file written by admin route
     const tmpPath = path.join(os.tmpdir(), "4got10-stripe-mode.json");
     let stripeMode: "test" | "live" = "test";
@@ -31,16 +121,16 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         : process.env.STRIPE_SECRET_KEY;
 
     const STRIPE_SECRET_KEY = secretFromEnv;
+    console.log(
+      `[stripe/checkout] mode=${stripeMode} key_prefix=${STRIPE_SECRET_KEY?.slice(0, 12)}...`,
+    );
     if (!STRIPE_SECRET_KEY) {
       return res
         .status(500)
         .json({ error: "Stripe secret key is not configured" });
     }
 
-    const BACKEND_URL =
-      process.env.BACKEND_URL ||
-      process.env.MEDUSA_BACKEND_URL ||
-      "http://localhost:9000";
+    // BACKEND_URL already defined above
 
     // Prefer provided snapshot, otherwise fetch via Store API
     let cart: any = providedCart;
@@ -129,14 +219,295 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       };
     });
 
+    // Build allowed shipping countries from region so customer can choose (filter to Stripe-supported ISO codes)
+    const stripeSupported = new Set([
+      "AC",
+      "AD",
+      "AE",
+      "AF",
+      "AG",
+      "AI",
+      "AL",
+      "AM",
+      "AO",
+      "AQ",
+      "AR",
+      "AT",
+      "AU",
+      "AW",
+      "AX",
+      "AZ",
+      "BA",
+      "BB",
+      "BD",
+      "BE",
+      "BF",
+      "BG",
+      "BH",
+      "BI",
+      "BJ",
+      "BL",
+      "BM",
+      "BN",
+      "BO",
+      "BQ",
+      "BR",
+      "BS",
+      "BT",
+      "BV",
+      "BW",
+      "BY",
+      "BZ",
+      "CA",
+      "CD",
+      "CF",
+      "CG",
+      "CH",
+      "CI",
+      "CK",
+      "CL",
+      "CM",
+      "CN",
+      "CO",
+      "CR",
+      "CV",
+      "CW",
+      "CY",
+      "CZ",
+      "DE",
+      "DJ",
+      "DK",
+      "DM",
+      "DO",
+      "DZ",
+      "EC",
+      "EE",
+      "EG",
+      "EH",
+      "ER",
+      "ES",
+      "ET",
+      "FI",
+      "FJ",
+      "FK",
+      "FO",
+      "FR",
+      "GA",
+      "GB",
+      "GD",
+      "GE",
+      "GF",
+      "GG",
+      "GH",
+      "GI",
+      "GL",
+      "GM",
+      "GN",
+      "GP",
+      "GQ",
+      "GR",
+      "GS",
+      "GT",
+      "GU",
+      "GW",
+      "GY",
+      "HK",
+      "HN",
+      "HR",
+      "HT",
+      "HU",
+      "ID",
+      "IE",
+      "IL",
+      "IM",
+      "IN",
+      "IO",
+      "IQ",
+      "IS",
+      "IT",
+      "JE",
+      "JM",
+      "JO",
+      "JP",
+      "KE",
+      "KG",
+      "KH",
+      "KI",
+      "KM",
+      "KN",
+      "KR",
+      "KW",
+      "KY",
+      "KZ",
+      "LA",
+      "LB",
+      "LC",
+      "LI",
+      "LK",
+      "LR",
+      "LS",
+      "LT",
+      "LU",
+      "LV",
+      "LY",
+      "MA",
+      "MC",
+      "MD",
+      "ME",
+      "MF",
+      "MG",
+      "MK",
+      "ML",
+      "MM",
+      "MN",
+      "MO",
+      "MQ",
+      "MR",
+      "MS",
+      "MT",
+      "MU",
+      "MV",
+      "MW",
+      "MX",
+      "MY",
+      "MZ",
+      "NA",
+      "NC",
+      "NE",
+      "NG",
+      "NI",
+      "NL",
+      "NO",
+      "NP",
+      "NR",
+      "NU",
+      "NZ",
+      "OM",
+      "PA",
+      "PE",
+      "PF",
+      "PG",
+      "PH",
+      "PK",
+      "PL",
+      "PM",
+      "PN",
+      "PR",
+      "PS",
+      "PT",
+      "PY",
+      "QA",
+      "RE",
+      "RO",
+      "RS",
+      "RU",
+      "RW",
+      "SA",
+      "SB",
+      "SC",
+      "SD",
+      "SE",
+      "SG",
+      "SH",
+      "SI",
+      "SJ",
+      "SK",
+      "SL",
+      "SM",
+      "SN",
+      "SO",
+      "SR",
+      "SS",
+      "ST",
+      "SV",
+      "SX",
+      "SZ",
+      "TA",
+      "TC",
+      "TD",
+      "TF",
+      "TG",
+      "TH",
+      "TJ",
+      "TK",
+      "TL",
+      "TM",
+      "TN",
+      "TO",
+      "TR",
+      "TT",
+      "TV",
+      "TW",
+      "TZ",
+      "UA",
+      "UG",
+      "US",
+      "UY",
+      "UZ",
+      "VA",
+      "VC",
+      "VE",
+      "VG",
+      "VN",
+      "VU",
+      "WF",
+      "WS",
+      "XK",
+      "YE",
+      "YT",
+      "ZA",
+      "ZM",
+      "ZW",
+      "ZZ",
+    ]);
+    let allowedCountries: string[] = [];
+    try {
+      const regionCountries = Array.isArray(cart?.region?.countries)
+        ? cart.region.countries
+        : [];
+      allowedCountries = regionCountries
+        .map((c: any) =>
+          (c?.iso_2 || c?.iso2 || c?.code || "").toString().toUpperCase(),
+        )
+        .filter((c: string) => !!c && c.length === 2 && stripeSupported.has(c));
+      allowedCountries = Array.from(new Set(allowedCountries));
+    } catch {}
+    // Fallback shortlist if region countries are unavailable
+    if (!allowedCountries.length) {
+      allowedCountries = [
+        "US",
+        "DK",
+        "DE",
+        "SE",
+        "NO",
+        "GB",
+        "FR",
+        "NL",
+        "BE",
+        "IT",
+        "ES",
+        "PT",
+        "IE",
+        "AT",
+        "CH",
+        "PL",
+      ].filter((c) => stripeSupported.has(c));
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
       line_items,
-      success_url: `${successBase}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${successBase}/api/checkout/complete?session_id={CHECKOUT_SESSION_ID}&country=${countryCode}`,
       // Redirect back to the localized cart page when customer cancels from Stripe
       cancel_url: `${successBase}/${countryCode}/cart`,
       customer_email: cart.email || undefined,
+      billing_address_collection: "required",
+      phone_number_collection: { enabled: true },
+      shipping_address_collection: {
+        allowed_countries: allowedCountries as any,
+      },
+      customer_creation: "always",
       metadata: {
         cart_id,
       },

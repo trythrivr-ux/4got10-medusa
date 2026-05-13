@@ -30,6 +30,13 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         title: item.title,
         quantity: item.quantity,
         unit_price: item.unit_price,
+        thumbnail:
+          item.thumbnail ||
+          item.product?.thumbnail ||
+          item.product?.images?.[0]?.url ||
+          null,
+        variant_title:
+          item.variant?.title || (item as any)?.variant_title || null,
       })),
       total: (order as any).total,
       currency: (order as any).currency_code || "USD",
