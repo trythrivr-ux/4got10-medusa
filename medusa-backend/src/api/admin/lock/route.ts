@@ -22,7 +22,10 @@ export async function POST(
     const { locked } = req.body;
     await updateSettings(req.scope, { locked });
     res.json({ locked });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update lock state" });
+  } catch (error: any) {
+    console.error("[admin/lock POST error]", error?.message, error?.stack);
+    res
+      .status(500)
+      .json({ error: error?.message || "Failed to update lock state" });
   }
 }

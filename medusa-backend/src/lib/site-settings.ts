@@ -18,5 +18,6 @@ export async function getSettings(scope: any) {
 export async function updateSettings(scope: any, patch: Record<string, any>) {
   const svc = scope.resolve("siteSettings") as any;
   const settings = await getSettings(scope);
-  return await svc.updateSiteSettings(settings.id, patch);
+  // MedusaService.update signature is (data, sharedContext) — id must be part of data
+  return await svc.updateSiteSettings({ id: settings.id, ...patch });
 }
