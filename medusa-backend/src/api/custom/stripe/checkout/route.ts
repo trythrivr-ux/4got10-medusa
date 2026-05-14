@@ -16,10 +16,18 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
     // Ensure the cart has an initialized payment collection with a Stripe payment session
     // This is required so completeCartWorkflow can succeed after Stripe returns
+    // Resolve backend base URL: env > forwarded headers > localhost
+    const forwardedProto = (req.headers["x-forwarded-proto"] as string) || "";
+    const forwardedHost =
+      (req.headers["x-forwarded-host"] as string) ||
+      (req.headers["host"] as string) ||
+      "";
     const BACKEND_URL =
       process.env.BACKEND_URL ||
       process.env.MEDUSA_BACKEND_URL ||
-      "http://localhost:9000";
+      (forwardedHost
+        ? `${forwardedProto || "http"}://${forwardedHost}`
+        : "http://127.0.0.1:9000");
     const publishableKey = process.env.MEDUSA_PUBLISHABLE_KEY || "";
 
     // Try to read current payment collection from provided cart or fetch minimal cart info
@@ -134,7 +142,12 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     let cart: any = providedCart;
     if (!cart) {
       const cartResp = await fetch(`${BACKEND_URL}/store/carts/${cart_id}`, {
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(publishableKey
+            ? { "x-publishable-api-key": publishableKey }
+            : {}),
+        },
       });
       if (!cartResp.ok) {
         return res
