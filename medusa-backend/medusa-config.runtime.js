@@ -30,6 +30,15 @@ module.exports = defineConfig({
       resolve: "./src/modules/product_meta",
     },
     {
+      resolve: "./src/modules/rollout",
+    },
+    {
+      resolve: "./src/modules/site-settings",
+    },
+    {
+      resolve: "./src/modules/email",
+    },
+    {
       resolve: "@medusajs/medusa/file",
       options: {
         providers: [
@@ -47,6 +56,36 @@ module.exports = defineConfig({
                 forcePathStyle: true,
               },
             },
+          },
+        ],
+      },
+    },
+    {
+      resolve: "@medusajs/medusa/payment",
+      options: {
+        providers: [
+          {
+            resolve: "@medusajs/payment-stripe",
+            id: "stripe",
+            options: {
+              apiKey:
+                process.env.STRIPE_MODE === "live"
+                  ? process.env.STRIPE_SECRET_KEY
+                  : process.env.STRIPE_SECRET_KEY_TEST ||
+                    process.env.STRIPE_SECRET_KEY,
+              webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+            },
+          },
+        ],
+      },
+    },
+    {
+      resolve: "@medusajs/medusa/auth",
+      options: {
+        providers: [
+          {
+            resolve: "@medusajs/auth-emailpass",
+            id: "emailpass",
           },
         ],
       },
