@@ -288,13 +288,54 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
           }
         } catch {}
 
-        // Authorize the payment session using Stripe Payment Intent id
         const intentId =
           typeof session.payment_intent === "string"
             ? session.payment_intent
             : (session.payment_intent as any)?.id;
+
+        // Ensure payment collection exists — create one if the checkout route missed it
+        if (!paymentCollectionId) {
+          try {
+            console.log(
+              "[stripe/success] no payment collection found, creating one now",
+            );
+            const pcResp = await fetch(
+              `${BACKEND_URL}/store/payment-collections`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(publishableKey
+                    ? { "x-publishable-api-key": publishableKey }
+                    : {}),
+                },
+                body: JSON.stringify({ cart_id }),
+              },
+            );
+            if (pcResp.ok) {
+              const pcJson = await pcResp.json();
+              paymentCollectionId = pcJson?.payment_collection?.id || null;
+              console.log(
+                "[stripe/success] created payment collection:",
+                paymentCollectionId,
+              );
+            } else {
+              console.error(
+                "[stripe/success] failed to create payment collection:",
+                await pcResp.text(),
+              );
+            }
+          } catch (pcErr) {
+            console.error(
+              "[stripe/success] payment collection creation error:",
+              (pcErr as any)?.message,
+            );
+          }
+        }
+
+        // Try to authorize the Stripe payment session if we have one
+        let authorized = false;
         if (paymentCollectionId && paymentSessionId && intentId) {
-          let authorized = false;
           try {
             const paymentModule: any = req.scope.resolve(
               "paymentModuleService",
@@ -311,66 +352,89 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
               },
             });
             authorized = true;
+            console.log(
+              "[stripe/success] authorized Stripe payment session:",
+              paymentSessionId,
+            );
           } catch (authErr) {
             console.error(
               "[stripe/success] authorizePaymentSession error:",
               (authErr as any)?.message,
             );
           }
+        }
 
-          // Fallback: create a manual/system payment session and authorize it
-          if (!authorized) {
-            try {
-              const BACKEND_URL =
-                process.env.BACKEND_URL ||
-                process.env.MEDUSA_BACKEND_URL ||
-                "http://localhost:9000";
-              const publishableKey =
-                process.env.MEDUSA_PUBLISHABLE_KEY ||
-                process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
-                "";
-
-              // Create pp_system_default session if not exists
-              const createResp = await fetch(
-                `${BACKEND_URL}/store/payment-collections/${paymentCollectionId}/payment-sessions`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    ...(publishableKey
-                      ? { "x-publishable-api-key": publishableKey }
-                      : {}),
-                  },
-                  body: JSON.stringify({ provider_id: "pp_system_default" }),
+        // Fallback: create a pp_system_default session and authorize it
+        // This covers: no Stripe session, authorization failure, or missing payment collection
+        if (!authorized && paymentCollectionId) {
+          try {
+            console.log(
+              "[stripe/success] using system default session fallback for collection:",
+              paymentCollectionId,
+            );
+            const createResp = await fetch(
+              `${BACKEND_URL}/store/payment-collections/${paymentCollectionId}/payment-sessions`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(publishableKey
+                    ? { "x-publishable-api-key": publishableKey }
+                    : {}),
                 },
-              );
+                body: JSON.stringify({ provider_id: "pp_system_default" }),
+              },
+            );
 
-              if (createResp.ok) {
-                const created = await createResp.json();
-                const manualId = created?.payment_session?.id;
-                if (manualId) {
-                  await fetch(
-                    `${BACKEND_URL}/store/payment-collections/${paymentCollectionId}/payment-sessions/${manualId}/authorize`,
-                    {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                        ...(publishableKey
-                          ? { "x-publishable-api-key": publishableKey }
-                          : {}),
-                      },
-                      body: JSON.stringify({ data: {} }),
+            if (createResp.ok) {
+              const created = await createResp.json();
+              const manualId = created?.payment_session?.id;
+              if (manualId) {
+                const authResp = await fetch(
+                  `${BACKEND_URL}/store/payment-collections/${paymentCollectionId}/payment-sessions/${manualId}/authorize`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      ...(publishableKey
+                        ? { "x-publishable-api-key": publishableKey }
+                        : {}),
                     },
+                    body: JSON.stringify({ data: {} }),
+                  },
+                );
+                if (authResp.ok) {
+                  authorized = true;
+                  console.log(
+                    "[stripe/success] authorized system default session:",
+                    manualId,
+                  );
+                } else {
+                  console.error(
+                    "[stripe/success] system default authorize failed:",
+                    await authResp.text(),
                   );
                 }
               }
-            } catch (fallbackErr) {
+            } else {
               console.error(
-                "[stripe/success] fallback manual authorization error:",
-                (fallbackErr as any)?.message,
+                "[stripe/success] system default session creation failed:",
+                await createResp.text(),
               );
             }
+          } catch (fallbackErr) {
+            console.error(
+              "[stripe/success] fallback authorization error:",
+              (fallbackErr as any)?.message,
+            );
           }
+        }
+
+        if (!authorized) {
+          console.error(
+            "[stripe/success] could not authorize any payment session for cart:",
+            cart_id,
+          );
         }
 
         console.log(
