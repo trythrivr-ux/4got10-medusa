@@ -1,8 +1,8 @@
 import { MedusaService } from "@medusajs/framework/utils";
-import { SiteSettings } from "./models/site-settings";
+import { SiteSetting } from "./models/site-settings";
 
 class SiteSettingsModuleService extends MedusaService({
-  SiteSettings,
+  SiteSetting,
 }) {}
 
 export default SiteSettingsModuleService;
