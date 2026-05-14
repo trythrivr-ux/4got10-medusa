@@ -34,8 +34,19 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
           },
         });
 
+        // Resolve media file URLs (files served via /files/{key} on this backend)
+        const backendUrl =
+          process.env.BACKEND_URL ||
+          process.env.MEDUSA_BACKEND_URL ||
+          "http://localhost:9000";
+        const mediaIds: string[] = rollout.media || [];
+        const media_urls: string[] = mediaIds.map(
+          (id: string) => `${backendUrl}/files/${id}`,
+        );
+
         return {
           ...rollout,
+          media_urls,
           products: products || [],
         };
       }),

@@ -46,3 +46,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     res.status(404).json({ error: "File not found" });
   }
 }
+
+export const config = {
+  authenticate: false,
+};
