@@ -10,6 +10,7 @@ import {
 } from "@medusajs/ui";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { DateTimePSTInput } from "../_components/date-pst-input";
 
 const EditRolloutPage = () => {
   const navigate = useNavigate();
@@ -73,17 +74,15 @@ const EditRolloutPage = () => {
         setName(rollout.name || "");
         setAnnouncementDate(
           rollout.announcement_date
-            ? new Date(rollout.announcement_date).toISOString().slice(0, 16)
+            ? new Date(rollout.announcement_date).toISOString()
             : "",
         );
         setDropDate(
-          rollout.drop_date
-            ? new Date(rollout.drop_date).toISOString().slice(0, 16)
-            : "",
+          rollout.drop_date ? new Date(rollout.drop_date).toISOString() : "",
         );
         setSoldOutDate(
           rollout.sold_out_date
-            ? new Date(rollout.sold_out_date).toISOString().slice(0, 16)
+            ? new Date(rollout.sold_out_date).toISOString()
             : "",
         );
         setHeadliner(rollout.headliner || "");
@@ -296,11 +295,9 @@ const EditRolloutPage = () => {
     try {
       const payload = {
         name,
-        announcement_date: announcementDate
-          ? new Date(announcementDate).toISOString()
-          : null,
-        drop_date: dropDate ? new Date(dropDate).toISOString() : null,
-        sold_out_date: soldOutDate ? new Date(soldOutDate).toISOString() : null,
+        announcement_date: announcementDate || null,
+        drop_date: dropDate || null,
+        sold_out_date: soldOutDate || null,
         headliner,
         description,
         media: media,
@@ -374,41 +371,26 @@ const EditRolloutPage = () => {
           )}
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="announcement-date" size="small">
-            Announcement Date (Reveal)
-          </Label>
-          <Input
-            id="announcement-date"
-            type="datetime-local"
-            value={announcementDate}
-            onChange={(e) => setAnnouncementDate(e.target.value)}
-          />
-        </div>
+        <DateTimePSTInput
+          id="announcement-date"
+          label="Announcement Date (Reveal)"
+          value={announcementDate}
+          onChange={setAnnouncementDate}
+        />
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="drop-date" size="small">
-            Drop Date
-          </Label>
-          <Input
-            id="drop-date"
-            type="datetime-local"
-            value={dropDate}
-            onChange={(e) => setDropDate(e.target.value)}
-          />
-        </div>
+        <DateTimePSTInput
+          id="drop-date"
+          label="Drop Date"
+          value={dropDate}
+          onChange={setDropDate}
+        />
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="sold-out-date" size="small">
-            Sold-out Date (Optional)
-          </Label>
-          <Input
-            id="sold-out-date"
-            type="datetime-local"
-            value={soldOutDate}
-            onChange={(e) => setSoldOutDate(e.target.value)}
-          />
-        </div>
+        <DateTimePSTInput
+          id="sold-out-date"
+          label="Sold-out Date (Optional)"
+          value={soldOutDate}
+          onChange={setSoldOutDate}
+        />
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="headliner" size="small">

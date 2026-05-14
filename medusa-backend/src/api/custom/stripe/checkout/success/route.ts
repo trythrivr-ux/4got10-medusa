@@ -56,12 +56,21 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         .json({ error: "This session has no cart_id metadata." });
     }
 
+    // Compute a single backend base URL for all internal fetches
+    const forwardedProto = (req.headers["x-forwarded-proto"] as string) || "";
+    const forwardedHost =
+      (req.headers["x-forwarded-host"] as string) ||
+      (req.headers["host"] as string) ||
+      "";
+    const BACKEND_URL =
+      process.env.BACKEND_URL ||
+      process.env.MEDUSA_BACKEND_URL ||
+      (forwardedHost
+        ? `${forwardedProto || "http"}://${forwardedHost}`
+        : "http://127.0.0.1:9000");
+
     // Sync Stripe-collected customer/shipping details back to the Medusa cart so the order captures them
     try {
-      const BACKEND_URL =
-        process.env.BACKEND_URL ||
-        process.env.MEDUSA_BACKEND_URL ||
-        "http://localhost:9000";
       const publishableKey =
         process.env.MEDUSA_PUBLISHABLE_KEY ||
         process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
@@ -120,10 +129,6 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
     // Idempotency: if an order already exists for this cart, return it directly
     try {
-      const BACKEND_URL =
-        process.env.BACKEND_URL ||
-        process.env.MEDUSA_BACKEND_URL ||
-        "http://localhost:9000";
       const publishableKey =
         process.env.MEDUSA_PUBLISHABLE_KEY ||
         process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
@@ -178,10 +183,6 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     if (!order) {
       try {
         // Fetch payment collection and find Stripe session id
-        const BACKEND_URL =
-          process.env.BACKEND_URL ||
-          process.env.MEDUSA_BACKEND_URL ||
-          "http://localhost:9000";
         const publishableKey =
           process.env.MEDUSA_PUBLISHABLE_KEY ||
           process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
@@ -220,7 +221,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
             // Fetch the order from Store API by cart_id to ensure items are populated for the success page
             try {
               const finalResp = await fetch(
-                `${process.env.BACKEND_URL || process.env.MEDUSA_BACKEND_URL || "http://localhost:9000"}/store/orders?cart_id=${encodeURIComponent(
+                `${BACKEND_URL}/store/orders?cart_id=${encodeURIComponent(
                   cart_id,
                 )}`,
                 {
@@ -254,10 +255,6 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
         // Final pass: fetch order from Store API so the shape matches the storefront expectation (ensures items and display_id)
         try {
-          const BACKEND_URL =
-            process.env.BACKEND_URL ||
-            process.env.MEDUSA_BACKEND_URL ||
-            "http://localhost:9000";
           const publishableKey =
             process.env.MEDUSA_PUBLISHABLE_KEY ||
             process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY ||
@@ -320,9 +317,15 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
                 paymentCollectionId,
               );
             } else {
+              const body = await pcResp.text();
               console.error(
-                "[stripe/success] failed to create payment collection:",
-                await pcResp.text(),
+                "[stripe/success] failed to create payment collection",
+                {
+                  status: pcResp.status,
+                  statusText: pcResp.statusText,
+                  url: `${BACKEND_URL}/store/payment-collections`,
+                  body,
+                },
               );
             }
           } catch (pcErr) {
