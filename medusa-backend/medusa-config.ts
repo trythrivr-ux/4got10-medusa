@@ -1,4 +1,4 @@
-import { loadEnv, defineConfig } from "@medusajs/framework/utils";
+import { loadEnv, defineConfig, Modules } from "@medusajs/framework/utils";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -109,6 +109,22 @@ module.exports = defineConfig({
             },
           },
         ],
+      },
+    },
+    {
+      key: Modules.ORDER,
+      options: {
+        generateCustomDisplayId: async () => {
+          // Branded short ID: 4GOT-XXXXXX (uppercase alphanumerics, no ambiguous chars)
+          const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+          let suffix = "";
+          for (let i = 0; i < 6; i++) {
+            suffix += ALPHABET.charAt(
+              Math.floor(Math.random() * ALPHABET.length),
+            );
+          }
+          return `4GOT-${suffix}`;
+        },
       },
     },
     {

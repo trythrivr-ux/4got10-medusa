@@ -93,6 +93,88 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       }
     } catch {}
 
+    // Ensure the cart has a shipping method before we send the customer to Stripe.
+    // This avoids "No shipping method selected" failures from completeCartWorkflow
+    // on the success route, and keeps Medusa totals in sync with Stripe totals.
+    try {
+      const cartCheckResp = await fetch(
+        `${BACKEND_URL}/store/carts/${encodeURIComponent(
+          cart_id,
+        )}?fields=id%2Cshipping_methods.id`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...(publishableKey
+              ? { "x-publishable-api-key": publishableKey }
+              : {}),
+          },
+          cache: "no-store",
+        },
+      );
+      let hasShipping = false;
+      if (cartCheckResp.ok) {
+        const j: any = await cartCheckResp.json();
+        hasShipping = Array.isArray(j?.cart?.shipping_methods)
+          ? j.cart.shipping_methods.length > 0
+          : false;
+      }
+      if (!hasShipping) {
+        const optsResp = await fetch(
+          `${BACKEND_URL}/store/shipping-options?cart_id=${encodeURIComponent(cart_id)}`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              ...(publishableKey
+                ? { "x-publishable-api-key": publishableKey }
+                : {}),
+            },
+            cache: "no-store",
+          },
+        );
+        if (optsResp.ok) {
+          const oj: any = await optsResp.json();
+          const opts: any[] = Array.isArray(oj?.shipping_options)
+            ? oj.shipping_options
+            : [];
+          const chosen = opts
+            .filter((o) => o?.id)
+            .sort((a, b) => {
+              const aAmt = Number.isFinite(a?.amount) ? a.amount : Infinity;
+              const bAmt = Number.isFinite(b?.amount) ? b.amount : Infinity;
+              return aAmt - bAmt;
+            })[0];
+          if (chosen?.id) {
+            await fetch(
+              `${BACKEND_URL}/store/carts/${encodeURIComponent(cart_id)}/shipping-methods`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(publishableKey
+                    ? { "x-publishable-api-key": publishableKey }
+                    : {}),
+                },
+                body: JSON.stringify({ option_id: chosen.id }),
+              },
+            ).catch(() => {});
+            console.log(
+              `[stripe/checkout] added default shipping method ${chosen.id} to cart ${cart_id}`,
+            );
+          } else {
+            console.warn(
+              "[stripe/checkout] no shipping option available for cart:",
+              cart_id,
+            );
+          }
+        }
+      }
+    } catch (shipErr) {
+      console.warn(
+        "[stripe/checkout] ensure shipping method error:",
+        (shipErr as any)?.message,
+      );
+    }
+
     // Create Stripe payment session for collection if missing
     try {
       if (paymentCollectionId && !hasStripeSession) {

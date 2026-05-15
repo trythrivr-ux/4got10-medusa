@@ -1,10 +1,121 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework";
+import { Modules } from "@medusajs/framework/utils";
 import Stripe from "stripe";
 import { getSettings } from "../../../../../lib/site-settings";
 import {
   completeCartWorkflow,
   capturePaymentWorkflow,
 } from "@medusajs/medusa/core-flows";
+
+// Ensure the cart has a shipping method selected before completing the order.
+// Stripe Checkout collects the shipping address but never sets a Medusa
+// shipping_method on the cart, so completeCartWorkflow would otherwise fail
+// with: "No shipping method selected but the cart contains items that require shipping."
+async function ensureShippingMethod(
+  cart_id: string,
+  backendUrl: string,
+  publishableKey: string,
+): Promise<void> {
+  try {
+    // 1. Check current cart for an existing shipping method
+    const cartResp = await fetch(
+      `${backendUrl}/store/carts/${encodeURIComponent(
+        cart_id,
+      )}?fields=id%2Cshipping_methods.id%2Cshipping_methods.shipping_option_id`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...(publishableKey
+            ? { "x-publishable-api-key": publishableKey }
+            : {}),
+        },
+        cache: "no-store",
+      },
+    );
+    if (cartResp.ok) {
+      const cartJson: any = await cartResp.json();
+      const existing = cartJson?.cart?.shipping_methods;
+      if (Array.isArray(existing) && existing.length > 0) {
+        return; // already has one
+      }
+    }
+
+    // 2. Fetch shipping options available for this cart
+    const optsResp = await fetch(
+      `${backendUrl}/store/shipping-options?cart_id=${encodeURIComponent(cart_id)}`,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...(publishableKey
+            ? { "x-publishable-api-key": publishableKey }
+            : {}),
+        },
+        cache: "no-store",
+      },
+    );
+    if (!optsResp.ok) {
+      console.warn(
+        "[stripe/success] could not list shipping options:",
+        optsResp.status,
+        await optsResp.text().catch(() => ""),
+      );
+      return;
+    }
+    const optsJson: any = await optsResp.json();
+    const options: any[] = Array.isArray(optsJson?.shipping_options)
+      ? optsJson.shipping_options
+      : [];
+    if (!options.length) {
+      console.warn(
+        "[stripe/success] no shipping options available for cart:",
+        cart_id,
+      );
+      return;
+    }
+
+    // 3. Pick the cheapest option (or the first if amounts are missing)
+    const sorted = options
+      .filter((o) => o?.id)
+      .sort((a, b) => {
+        const aAmt = Number.isFinite(a?.amount) ? a.amount : Infinity;
+        const bAmt = Number.isFinite(b?.amount) ? b.amount : Infinity;
+        return aAmt - bAmt;
+      });
+    const chosen = sorted[0];
+    if (!chosen?.id) return;
+
+    // 4. Add it to the cart
+    const addResp = await fetch(
+      `${backendUrl}/store/carts/${encodeURIComponent(cart_id)}/shipping-methods`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(publishableKey
+            ? { "x-publishable-api-key": publishableKey }
+            : {}),
+        },
+        body: JSON.stringify({ option_id: chosen.id }),
+      },
+    );
+    if (!addResp.ok) {
+      console.warn(
+        "[stripe/success] failed to add shipping method:",
+        addResp.status,
+        await addResp.text().catch(() => ""),
+      );
+      return;
+    }
+    console.log(
+      `[stripe/success] added shipping method ${chosen.id} (${chosen.name || ""}) to cart ${cart_id}`,
+    );
+  } catch (err) {
+    console.warn(
+      "[stripe/success] ensureShippingMethod error:",
+      (err as any)?.message,
+    );
+  }
+}
 
 // POST /custom/stripe/checkout/success
 // Body: { session_id: string }
@@ -340,9 +451,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         let authorized = false;
         if (paymentCollectionId && paymentSessionId && intentId) {
           try {
-            const paymentModule: any = req.scope.resolve(
-              "paymentModuleService",
-            );
+            const paymentModule: any = req.scope.resolve(Modules.PAYMENT);
             await paymentModule.authorizePaymentSession(paymentSessionId, {
               data: {
                 payment_intent_id: intentId,
@@ -439,6 +548,11 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
             cart_id,
           );
         }
+
+        // Ensure the cart has a shipping method — Stripe Checkout collects the
+        // shipping address but does not set a Medusa shipping_method, so we
+        // pick a default one here before completing the cart.
+        await ensureShippingMethod(cart_id, BACKEND_URL, publishableKey);
 
         console.log(
           `[stripe/success] completing cart ${cart_id} for session ${session_id}`,
