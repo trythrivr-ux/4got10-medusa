@@ -1,6 +1,5 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import Stripe from "stripe";
-import { getSettings } from "../../../../lib/site-settings";
 
 // POST /custom/stripe/checkout
 // Body: { cart_id: string }
@@ -194,14 +193,10 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       }
     } catch {}
 
-    // Determine Stripe mode from DB settings, fall back to STRIPE_MODE env var
-    let stripeMode: "test" | "live" = "test";
-    try {
-      const settings = await getSettings(req.scope);
-      if (settings.stripe_mode === "live") stripeMode = "live";
-    } catch {
-      if (process.env.STRIPE_MODE === "live") stripeMode = "live";
-    }
+    // Stripe mode is deploy-time only (env-driven) so this matches the
+    // registered Stripe provider's apiKey + webhookSecret loaded at boot.
+    const stripeMode: "test" | "live" =
+      process.env.STRIPE_MODE === "live" ? "live" : "test";
 
     const secretFromEnv =
       stripeMode === "test"

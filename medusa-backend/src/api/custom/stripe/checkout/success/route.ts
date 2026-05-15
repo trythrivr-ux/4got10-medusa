@@ -1,7 +1,6 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import { Modules } from "@medusajs/framework/utils";
 import Stripe from "stripe";
-import { getSettings } from "../../../../../lib/site-settings";
 import {
   completeCartWorkflow,
   capturePaymentWorkflow,
@@ -128,14 +127,10 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       return res.status(400).json({ error: "session_id is required" });
     }
 
-    // Determine Stripe mode from DB settings, fall back to STRIPE_MODE env var
-    let stripeMode: "test" | "live" = "test";
-    try {
-      const settings = await getSettings(req.scope);
-      if (settings.stripe_mode === "live") stripeMode = "live";
-    } catch {
-      if (process.env.STRIPE_MODE === "live") stripeMode = "live";
-    }
+    // Stripe mode is deploy-time only (env-driven) so this matches the
+    // registered Stripe provider's apiKey + webhookSecret loaded at boot.
+    const stripeMode: "test" | "live" =
+      process.env.STRIPE_MODE === "live" ? "live" : "test";
 
     const STRIPE_SECRET_KEY =
       stripeMode === "test"
@@ -147,10 +142,13 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         .json({ error: "Stripe secret key is not configured" });
     }
 
-    // Verify the Stripe session and confirm payment was received
+    // Verify the Stripe session and confirm payment was received.
+    // Expand customer + payment_intent.payment_method so wallet payments
+    // (Apple Pay / Google Pay / Link) expose their full billing/shipping
+    // payload — these often arrive in different fields than manual card entry.
     const stripe = new Stripe(STRIPE_SECRET_KEY);
     const session = await stripe.checkout.sessions.retrieve(session_id, {
-      expand: ["payment_intent"],
+      expand: ["payment_intent", "payment_intent.payment_method", "customer"],
     });
 
     if (session.payment_status !== "paid") {
@@ -180,7 +178,10 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         ? `${forwardedProto || "http"}://${forwardedHost}`
         : "http://127.0.0.1:9000");
 
-    // Sync Stripe-collected customer/shipping details back to the Medusa cart so the order captures them
+    // Sync Stripe-collected customer/shipping details back to the Medusa cart so the order captures them.
+    // Wallet payments (Apple Pay / Google Pay / Link) populate slightly different fields than
+    // manual card entry. Below we read every plausible source so we never end up with a half-empty
+    // address on the order.
     try {
       const publishableKey =
         process.env.MEDUSA_PUBLISHABLE_KEY ||
@@ -193,50 +194,106 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         sessionData.shipping_details || sessionData.shipping || {};
       const shipAddr: any = shipping.address || {};
       const billAddr: any = details.address || {};
+      const customerObj: any =
+        typeof sessionData.customer === "object" && sessionData.customer
+          ? sessionData.customer
+          : {};
+      const pm: any = sessionData.payment_intent?.payment_method || {};
+      const pmBilling: any = pm.billing_details || {};
+      const pmBillAddr: any = pmBilling.address || {};
 
-      const fullName = (shipping.name || details.name || "").trim();
+      // Email: customer_details > top-level customer_email > expanded customer > payment method billing
+      const email =
+        details.email ||
+        sessionData.customer_email ||
+        customerObj.email ||
+        pmBilling.email ||
+        undefined;
+
+      // Phone: customer_details > shipping_details > customer > payment method billing
+      const phone =
+        details.phone ||
+        shipping.phone ||
+        customerObj.phone ||
+        pmBilling.phone ||
+        undefined;
+
+      // Name: shipping_details > customer_details > customer > payment method billing
+      const fullName = (
+        shipping.name ||
+        details.name ||
+        customerObj.name ||
+        pmBilling.name ||
+        ""
+      ).trim();
       const [first_name, ...restName] = fullName.split(" ");
       const last_name = restName.join(" ") || undefined;
 
-      const toMedusaAddr = (addr: any, phone?: string) => ({
-        first_name: first_name || undefined,
-        last_name: last_name || undefined,
-        address_1: addr.line1 || addr.line_1 || undefined,
-        address_2: addr.line2 || addr.line_2 || undefined,
-        city: addr.city || undefined,
-        province: addr.state || addr.region || undefined,
-        postal_code: addr.postal_code || addr.postalCode || undefined,
-        country_code:
-          (addr.country || "").toString().toLowerCase() || undefined,
-        phone: phone || undefined,
-      });
+      const toMedusaAddr = (addr: any, fallbackAddr?: any) => {
+        const a = addr && Object.keys(addr).length ? addr : fallbackAddr || {};
+        return {
+          first_name: first_name || undefined,
+          last_name: last_name || undefined,
+          address_1: a.line1 || a.line_1 || undefined,
+          address_2: a.line2 || a.line_2 || undefined,
+          city: a.city || undefined,
+          province: a.state || a.region || undefined,
+          postal_code: a.postal_code || a.postalCode || undefined,
+          country_code: (a.country || "").toString().toLowerCase() || undefined,
+          phone: phone || undefined,
+        };
+      };
 
-      const shipping_address = toMedusaAddr(
-        shipAddr,
-        shipping.phone || details.phone,
-      );
-      const billing_address = toMedusaAddr(
-        billAddr,
-        details.phone || shipping.phone,
+      // For wallets, billing address often lives on the payment method, not customer_details
+      const shipping_address = toMedusaAddr(shipAddr, billAddr || pmBillAddr);
+      const billing_address = toMedusaAddr(billAddr, pmBillAddr || shipAddr);
+
+      console.log(
+        `[stripe/success] sync cart ${cart_id} email=${email ? "set" : "MISSING"} phone=${phone ? "set" : "MISSING"} ship_country=${shipping_address.country_code || "MISSING"} ship_postal=${shipping_address.postal_code || "MISSING"} bill_country=${billing_address.country_code || "MISSING"} pm_type=${pm.type || "?"}`,
       );
 
       const cartUpdate: any = {
-        email: details.email || undefined,
+        email,
         shipping_address,
         billing_address,
       };
+      // Only send keys with truthy values — Medusa's POST /store/carts/:id replaces
+      // the whole address object, so partial wallet data must not nuke a good prior address.
+      if (!email) delete cartUpdate.email;
+      if (!shipping_address.address_1 || !shipping_address.country_code) {
+        console.warn(
+          `[stripe/success] skipping shipping_address overwrite for cart ${cart_id} — wallet returned incomplete address`,
+        );
+        delete cartUpdate.shipping_address;
+      }
+      if (!billing_address.address_1 || !billing_address.country_code) {
+        console.warn(
+          `[stripe/success] skipping billing_address overwrite for cart ${cart_id} — wallet returned incomplete address`,
+        );
+        delete cartUpdate.billing_address;
+      }
 
-      await fetch(`${BACKEND_URL}/store/carts/${encodeURIComponent(cart_id)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(publishableKey
-            ? { "x-publishable-api-key": publishableKey }
-            : {}),
-        },
-        body: JSON.stringify(cartUpdate),
-      }).catch(() => {});
-    } catch {}
+      if (Object.keys(cartUpdate).length) {
+        await fetch(
+          `${BACKEND_URL}/store/carts/${encodeURIComponent(cart_id)}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(publishableKey
+                ? { "x-publishable-api-key": publishableKey }
+                : {}),
+            },
+            body: JSON.stringify(cartUpdate),
+          },
+        ).catch(() => {});
+      }
+    } catch (syncErr: any) {
+      console.warn(
+        `[stripe/success] cart sync error for ${cart_id}:`,
+        syncErr?.message,
+      );
+    }
 
     // Idempotency: if an order already exists for this cart, return it directly
     try {

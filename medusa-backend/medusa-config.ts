@@ -1,7 +1,4 @@
 import { loadEnv, defineConfig, Modules } from "@medusajs/framework/utils";
-import fs from "fs";
-import os from "os";
-import path from "path";
 
 // Only load .env file in development, not in production (Railway provides env vars)
 if (process.env.NODE_ENV !== "production") {
@@ -20,18 +17,12 @@ if (
     process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY;
 }
 
-// Pick Stripe mode from admin switch tmp file (set via Admin UI toggle),
-// falling back to STRIPE_MODE env var (useful for Railway production), then "test".
-let stripeMode: "test" | "live" = "test";
-try {
-  const tmpFile = path.join(os.tmpdir(), "4got10-stripe-mode.json");
-  const raw = fs.readFileSync(tmpFile, "utf8");
-  const parsed = JSON.parse(raw);
-  if (parsed?.mode === "live") stripeMode = "live";
-} catch {
-  // Tmp file not found (e.g. first boot on Railway) — fall back to env var
-  if (process.env.STRIPE_MODE === "live") stripeMode = "live";
-}
+// Stripe mode is deploy-time only (env-driven). To switch test ↔ live, change
+// STRIPE_MODE on Railway and redeploy. This guarantees the registered Stripe
+// provider's apiKey AND webhookSecret always match — preventing webhook
+// signature mismatches that would silently break order completion.
+const stripeMode: "test" | "live" =
+  process.env.STRIPE_MODE === "live" ? "live" : "test";
 
 const stripeApiKey =
   stripeMode === "live"
@@ -42,6 +33,10 @@ const stripeWebhookSecret =
     ? process.env.STRIPE_WEBHOOK_SECRET_LIVE ||
       process.env.STRIPE_WEBHOOK_SECRET
     : process.env.STRIPE_WEBHOOK_SECRET;
+
+console.log(
+  `[medusa-config] stripeMode=${stripeMode} apiKeyPrefix=${stripeApiKey?.slice(0, 8) || "(none)"} webhookSecret=${stripeWebhookSecret ? "set" : "MISSING"}`,
+);
 
 module.exports = defineConfig({
   projectConfig: {

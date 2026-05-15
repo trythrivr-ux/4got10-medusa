@@ -73,7 +73,11 @@ module.exports = defineConfig({
                   ? process.env.STRIPE_SECRET_KEY
                   : process.env.STRIPE_SECRET_KEY_TEST ||
                     process.env.STRIPE_SECRET_KEY,
-              webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+              webhookSecret:
+                process.env.STRIPE_MODE === "live"
+                  ? process.env.STRIPE_WEBHOOK_SECRET_LIVE ||
+                    process.env.STRIPE_WEBHOOK_SECRET
+                  : process.env.STRIPE_WEBHOOK_SECRET,
             },
           },
         ],

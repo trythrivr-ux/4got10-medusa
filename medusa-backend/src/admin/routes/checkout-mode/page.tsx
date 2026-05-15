@@ -1,5 +1,5 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk";
-import { Container, Heading, Switch, Label, toast } from "@medusajs/ui";
+import { Badge, Container, Heading, Switch, Label, toast } from "@medusajs/ui";
 import { useState, useEffect } from "react";
 
 const CheckoutModePage = () => {
@@ -29,37 +29,6 @@ const CheckoutModePage = () => {
       console.error("Failed to fetch checkout mode:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleStripeToggle = async (checked: boolean) => {
-    setSaving(true);
-    const newStripeMode: "test" | "live" = checked ? "live" : "test";
-    try {
-      const response = await fetch("/admin/checkout-mode", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ stripe_mode: newStripeMode }),
-      });
-
-      if (response.ok) {
-        setStripeMode(newStripeMode);
-        toast.success(
-          `Stripe mode set to ${newStripeMode.toUpperCase()} successfully`,
-        );
-      } else {
-        toast.error("Failed to update Stripe mode");
-        fetchCheckoutMode();
-      }
-    } catch (error) {
-      console.error("Failed to update Stripe mode:", error);
-      toast.error("Failed to update Stripe mode");
-      fetchCheckoutMode();
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -124,16 +93,16 @@ const CheckoutModePage = () => {
       </div>
 
       <div className="flex items-center gap-4 p-4 bg-white rounded-lg border mt-4">
-        <Switch
-          checked={stripeMode === "live"}
-          onCheckedChange={handleStripeToggle}
-          disabled={saving}
-        />
+        <Badge color={stripeMode === "live" ? "green" : "orange"}>
+          {stripeMode.toUpperCase()}
+        </Badge>
         <div className="flex flex-col gap-1">
-          <Label>Stripe Mode: {stripeMode.toUpperCase()}</Label>
+          <Label>Stripe Mode (read-only)</Label>
           <p className="text-sm text-gray-500">
-            Toggle between Test and Live Stripe keys. Test mode uses
-            STRIPE_SECRET_KEY_TEST.
+            Deploy-time only. To change, set <code>STRIPE_MODE=live</code> (or
+            <code> test</code>) on Railway and redeploy. The provider's API key
+            and webhook secret are loaded once at boot — switching at runtime
+            would break webhook signature verification.
           </p>
         </div>
       </div>
