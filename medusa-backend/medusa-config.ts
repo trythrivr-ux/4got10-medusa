@@ -104,6 +104,9 @@ module.exports = defineConfig({
             options: {
               apiKey: stripeApiKey,
               webhookSecret: stripeWebhookSecret,
+              // Capture funds immediately at checkout instead of authorize-only.
+              // This sets Stripe's capture_method to "automatic" on the PaymentIntent.
+              capture: true,
             },
           },
         ],

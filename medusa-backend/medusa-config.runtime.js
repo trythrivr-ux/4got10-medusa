@@ -81,6 +81,8 @@ module.exports = defineConfig({
                   ? process.env.STRIPE_WEBHOOK_SECRET_LIVE ||
                     process.env.STRIPE_WEBHOOK_SECRET
                   : process.env.STRIPE_WEBHOOK_SECRET,
+              // Capture funds immediately at checkout instead of authorize-only.
+              capture: true,
             },
           },
         ],
