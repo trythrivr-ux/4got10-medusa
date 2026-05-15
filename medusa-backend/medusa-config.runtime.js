@@ -33,6 +33,9 @@ module.exports = defineConfig({
       resolve: "./src/modules/rollout",
     },
     {
+      resolve: "./src/modules/feature",
+    },
+    {
       resolve: "./src/modules/site-settings",
     },
     {

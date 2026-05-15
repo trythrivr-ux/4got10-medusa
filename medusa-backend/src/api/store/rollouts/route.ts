@@ -10,7 +10,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     // The frontend will handle the filtering based on announcement_date
     const { data: rollouts } = await query.graph({
       entity: "rollout",
-      fields: ["*"],
+      fields: ["*", "headliner_media"],
     });
 
     // For each rollout, get the full product details
@@ -44,9 +44,16 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
           (id: string) => `${backendUrl}/files/${id}`,
         );
 
+        // Resolve headliner media URLs
+        const headlinerMediaIds: string[] = rollout.headliner_media || [];
+        const headliner_media_urls: string[] = headlinerMediaIds.map(
+          (id: string) => `${backendUrl}/files/${id}`,
+        );
+
         return {
           ...rollout,
           media_urls,
+          headliner_media_urls,
           products: products || [],
         };
       }),
